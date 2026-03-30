@@ -8,7 +8,9 @@
       "Bash(openssl version:*)",
       "Bash(mkdir -p /workspaces/Kavita-Library/kavita-reader/certs)",
       "Bash(openssl req:*)",
-      "Bash(pkill -f \"node.*serve\")"
+      "Bash(pkill -f \"node.*serve\")",
+      "Read(//tmp/**)",
+      "Bash(curl -sk -o /dev/null -w \"%{http_code}\" https://localhost:3000/)"
     ]
   }
 }

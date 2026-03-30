@@ -114,23 +114,20 @@ class KavitaAPI {
   }
 
   async login(): Promise<boolean> {
-    try {
-      const response = await this.client.post('/api/Plugin/authenticate', null, {
-        params: {
-          apiKey: this.apiKey,
-          pluginName: 'KavitaReaderApp',
-        },
-      });
-      if (response.data?.token) {
-        this.jwtToken = response.data.token;
-        await storage.setItem(STORAGE_KEYS.JWT_TOKEN, this.jwtToken);
-        return true;
-      }
-      return false;
-    } catch (err) {
-      console.error('Login error:', err);
-      return false;
+    const response = await this.client.post('/api/Plugin/authenticate', null, {
+      params: {
+        apiKey: this.apiKey,
+        pluginName: 'KavitaReaderApp',
+      },
+    });
+    console.log('[KavitaAPI] login response status:', response.status);
+    console.log('[KavitaAPI] login response data:', JSON.stringify(response.data));
+    if (response.data?.token) {
+      this.jwtToken = response.data.token;
+      await storage.setItem(STORAGE_KEYS.JWT_TOKEN, this.jwtToken);
+      return true;
     }
+    return false;
   }
 
   async logout() {
