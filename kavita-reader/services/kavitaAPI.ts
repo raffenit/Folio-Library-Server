@@ -1,5 +1,14 @@
 import axios, { AxiosInstance } from 'axios';
+import { Platform } from 'react-native';
 import { storage } from './storage';
+
+function isProxyMode(): boolean {
+  return (
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    (window as any).__KAVITA_PROXY__ === true
+  );
+}
 
 const STORAGE_KEYS = {
   SERVER_URL: 'kavita_server_url',
@@ -96,15 +105,16 @@ class KavitaAPI {
       const storedUrl = (await storage.getItem(STORAGE_KEYS.SERVER_URL)) || '';
       this.apiKey = (await storage.getItem(STORAGE_KEYS.API_KEY)) || '';
       this.jwtToken = (await storage.getItem(STORAGE_KEYS.JWT_TOKEN)) || '';
-      if (storedUrl) {
-        // Normalize legacy stored URLs that may be missing the protocol
+      if (isProxyMode()) {
+        this.serverUrl = '';
+        this.client.defaults.baseURL = '';
+      } else if (storedUrl) {
         let cleanUrl = storedUrl.replace(/\/$/, '');
         if (!/^https?:\/\//i.test(cleanUrl)) {
           cleanUrl = 'http://' + cleanUrl;
         }
         this.serverUrl = cleanUrl;
         this.client.defaults.baseURL = cleanUrl;
-        // Persist the fixed URL back to storage
         await storage.setItem(STORAGE_KEYS.SERVER_URL, cleanUrl);
       }
     } catch (e) {
@@ -113,15 +123,20 @@ class KavitaAPI {
   }
 
   async saveCredentials(serverUrl: string, apiKey: string) {
+    this.apiKey = apiKey;
+    await storage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+    if (isProxyMode()) {
+      this.serverUrl = '';
+      this.client.defaults.baseURL = '';
+      return;
+    }
     let cleanUrl = serverUrl.trim().replace(/\/$/, '');
     if (!/^https?:\/\//i.test(cleanUrl)) {
       cleanUrl = 'http://' + cleanUrl;
     }
     this.serverUrl = cleanUrl;
-    this.apiKey = apiKey;
     this.client.defaults.baseURL = cleanUrl;
     await storage.setItem(STORAGE_KEYS.SERVER_URL, cleanUrl);
-    await storage.setItem(STORAGE_KEYS.API_KEY, apiKey);
   }
 
   async login(): Promise<boolean> {

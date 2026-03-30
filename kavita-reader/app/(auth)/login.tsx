@@ -13,9 +13,14 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Typography, Spacing, Radius } from '../../constants/theme';
 
+const proxyUrl =
+  Platform.OS === 'web' && typeof window !== 'undefined'
+    ? (window as any).__KAVITA_URL__ ?? null
+    : null;
+
 export default function LoginScreen() {
   const { login } = useAuth();
-  const [serverUrl, setServerUrl] = useState('');
+  const [serverUrl, setServerUrl] = useState(proxyUrl ?? '');
   const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [urlFocused, setUrlFocused] = useState(false);
@@ -24,8 +29,12 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     setError('');
-    if (!serverUrl.trim() || !apiKey.trim()) {
-      setError('Please enter both your server URL and API key.');
+    if (!proxyUrl && !serverUrl.trim()) {
+      setError('Please enter your server URL.');
+      return;
+    }
+    if (!apiKey.trim()) {
+      setError('Please enter your API key.');
       return;
     }
     setLoading(true);
@@ -56,7 +65,7 @@ export default function LoginScreen() {
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Server URL</Text>
             <TextInput
-              style={[styles.input, urlFocused && styles.inputFocused]}
+              style={[styles.input, urlFocused && styles.inputFocused, proxyUrl && styles.inputReadonly]}
               value={serverUrl}
               onChangeText={setServerUrl}
               placeholder="192.168.1.100:5000 or http://..."
@@ -64,10 +73,13 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
+              editable={!proxyUrl}
               onFocus={() => setUrlFocused(true)}
               onBlur={() => setUrlFocused(false)}
             />
-            <Text style={styles.hint}>The URL of your self-hosted Kavita instance</Text>
+            <Text style={styles.hint}>
+              {proxyUrl ? 'Routed via local proxy' : 'The URL of your self-hosted Kavita instance'}
+            </Text>
           </View>
 
           <View style={styles.fieldGroup}>
@@ -206,6 +218,9 @@ const styles = StyleSheet.create({
     fontSize: Typography.sm,
     color: Colors.error,
     lineHeight: 18,
+  },
+  inputReadonly: {
+    opacity: 0.5,
   },
   loginButton: {
     backgroundColor: Colors.accent,
