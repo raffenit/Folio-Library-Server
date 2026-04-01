@@ -414,105 +414,107 @@ export default function SettingsScreen() {
   const displayUrl = serverUrl.replace(/^https?:\/\//, '');
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-      </View>
-
-      {/* Kavita section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Kavita</Text>
-        <View style={styles.card}>
-          <SettingRow
-            icon="server-outline"
-            label="Kavita Server"
-            value="Connected"
-            onPress={() => setKavitaModalVisible(true)}
-            statusText={displayUrl}
-            statusOk
-          />
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Settings</Text>
         </View>
-      </View>
 
-      {/* File Health */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>File Health</Text>
-        <Text style={styles.sectionNote}>
-          Scanning re-reads all files and rebuilds metadata. Analysis checks for corrupted or
-          unreadable content. Both run as background tasks on your Kavita server.
+        {/* Kavita section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Kavita</Text>
+          <View style={styles.card}>
+            <SettingRow
+              icon="server-outline"
+              label="Kavita Server"
+              value="Connected"
+              onPress={() => setKavitaModalVisible(true)}
+              statusText={displayUrl}
+              statusOk
+            />
+          </View>
+        </View>
+
+        {/* File Health */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>File Health</Text>
+          <Text style={styles.sectionNote}>
+            Scanning re-reads all files and rebuilds metadata. Analysis checks for corrupted or
+            unreadable content. Both run as background tasks on your Kavita server.
+          </Text>
+          <View style={styles.card}>
+            <SettingRow
+              icon="refresh-outline"
+              label="Scan All Libraries"
+              onPress={handleScanAll}
+              loading={scanLoading}
+              statusText={scanStatus}
+              statusOk={scanOk}
+            />
+            <View style={styles.divider} />
+            <SettingRow
+              icon="bug-outline"
+              label="Analyze Files"
+              onPress={handleAnalyze}
+              loading={analyzeLoading}
+              statusText={analyzeStatus}
+              statusOk={analyzeOk}
+            />
+          </View>
+        </View>
+
+        {/* Audiobookshelf section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Audiobookshelf</Text>
+          <View style={styles.card}>
+            <SettingRow
+              icon="headset-outline"
+              label="Audiobookshelf Server"
+              value={absConnected ? 'Connected' : 'Not configured'}
+              onPress={() => setAbsModalVisible(true)}
+              statusText={absConnected ? absAPI.getServerUrl().replace(/^https?:\/\//, '') : undefined}
+              statusOk={absConnected}
+            />
+          </View>
+        </View>
+
+        {/* About section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <View style={styles.card}>
+            <SettingRow
+              icon="information-circle-outline"
+              label="Kavita Reader"
+              value="v1.0.0"
+            />
+            <View style={styles.divider} />
+            <SettingRow
+              icon="globe-outline"
+              label="Kavita Project"
+              value="kavitareader.com"
+            />
+          </View>
+        </View>
+
+
+        <Text style={styles.footer}>
+          Kavita Reader is an unofficial client for self-hosted Kavita servers.
         </Text>
-        <View style={styles.card}>
-          <SettingRow
-            icon="refresh-outline"
-            label="Scan All Libraries"
-            onPress={handleScanAll}
-            loading={scanLoading}
-            statusText={scanStatus}
-            statusOk={scanOk}
-          />
-          <View style={styles.divider} />
-          <SettingRow
-            icon="bug-outline"
-            label="Analyze Files"
-            onPress={handleAnalyze}
-            loading={analyzeLoading}
-            statusText={analyzeStatus}
-            statusOk={analyzeOk}
-          />
-        </View>
-      </View>
+      </ScrollView>
 
-      {/* Audiobookshelf section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Audiobookshelf</Text>
-        <View style={styles.card}>
-          <SettingRow
-            icon="headset-outline"
-            label="Audiobookshelf Server"
-            value={absConnected ? 'Connected' : 'Not configured'}
-            onPress={() => setAbsModalVisible(true)}
-            statusText={absConnected ? absAPI.getServerUrl().replace(/^https?:\/\//, '') : undefined}
-            statusOk={absConnected}
-          />
-        </View>
-      </View>
+      <KavitaConfigModal
+        visible={kavitaModalVisible}
+        onClose={() => setKavitaModalVisible(false)}
+      />
 
-      {/* About section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        <View style={styles.card}>
-          <SettingRow
-            icon="information-circle-outline"
-            label="Kavita Reader"
-            value="v1.0.0"
-          />
-          <View style={styles.divider} />
-          <SettingRow
-            icon="globe-outline"
-            label="Kavita Project"
-            value="kavitareader.com"
-          />
-        </View>
-      </View>
-
-
-      <Text style={styles.footer}>
-        Kavita Reader is an unofficial client for self-hosted Kavita servers.
-      </Text>
-    </ScrollView>
-
-    <KavitaConfigModal
-      visible={kavitaModalVisible}
-      onClose={() => setKavitaModalVisible(false)}
-    />
-
-    <ABSConfigModal
-      visible={absModalVisible}
-      onClose={() => {
-        setAbsModalVisible(false);
-        setAbsConnected(absAPI.hasCredentials());
-      }}
-    />
+      <ABSConfigModal
+        visible={absModalVisible}
+        onClose={() => {
+          setAbsModalVisible(false);
+          setAbsConnected(absAPI.hasCredentials());
+        }}
+      />
+    </>
   );
 }
 
