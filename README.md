@@ -1,6 +1,8 @@
-# Kavita Reader
+# Book Server Interface
 
-A React Native (Expo) mobile app for reading ebooks, PDFs, and comics from your self-hosted [Kavita](https://www.kavitareader.com/) server.
+A React Native (Expo) mobile app for:
+- Reading ebooks, PDFs, and comics from your self-hosted [Kavita](https://www.kavitareader.com/) server
+- Listening to audiobooks and podcasts from your self-hosted [AudioBookShelf](https://www.audiobookshelf.org/) server
 
 ## Features
 
