@@ -104,85 +104,87 @@ export default function AudiobookPlayerScreen() {
   const coverUri = absAPI.getCoverUrl(displayItem.id);
 
   return (
-    <View style={styles.container}>
-      {/* Back */}
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Ionicons name="chevron-down" size={28} color={Colors.textPrimary} />
-      </TouchableOpacity>
+    <>
+      <View style={styles.container}>
+        {/* Back */}
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-down" size={28} color={Colors.textPrimary} />
+        </TouchableOpacity>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Cover */}
-        <Image source={{ uri: coverUri }} style={styles.cover} />
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* Cover */}
+          <Image source={{ uri: coverUri }} style={styles.cover} />
 
-        {/* Title + Author */}
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>{meta.title}</Text>
-          {meta.authorName ? <Text style={styles.author}>{meta.authorName}</Text> : null}
-          {meta.narrator ? <Text style={styles.narrator}>Narrated by {meta.narrator}</Text> : null}
-        </View>
-
-        {/* Seeker */}
-        <SeekBar
-          current={displayTime}
-          duration={duration}
-          onSeek={async (v) => { await seekSession(v); }}
-        />
-
-        {/* Controls */}
-        <View style={styles.controls}>
-          <TouchableOpacity onPress={() => skipBack(15)} style={styles.controlBtn}>
-            <Ionicons name="play-back" size={28} color={Colors.textPrimary} />
-            <Text style={styles.skipLabel}>15</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={togglePlayPause} style={styles.playBtn}>
-            <Ionicons
-              name={isPlaying && isCurrentItem ? 'pause' : 'play'}
-              size={36}
-              color={Colors.textOnAccent}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => skipForward(30)} style={styles.controlBtn}>
-            <Ionicons name="play-forward" size={28} color={Colors.textPrimary} />
-            <Text style={styles.skipLabel}>30</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Chapter list */}
-        {isCurrentItem && nowPlaying!.tracks.length > 1 && (
-          <View style={styles.chaptersBlock}>
-            <Text style={styles.chaptersHeading}>Chapters</Text>
-            {nowPlaying!.tracks.map((track, i) => (
-              <TouchableOpacity
-                key={track.index}
-                style={[
-                  styles.chapterRow,
-                  i === nowPlaying!.trackIndex && styles.chapterRowActive,
-                ]}
-                onPress={() => seekSession(track.startOffset)}
-              >
-                <Text style={[
-                  styles.chapterTitle,
-                  i === nowPlaying!.trackIndex && styles.chapterTitleActive,
-                ]} numberOfLines={1}>
-                  {track.title || `Chapter ${i + 1}`}
-                </Text>
-                <Text style={styles.chapterDuration}>{formatTime(track.duration)}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Title + Author */}
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>{meta.title}</Text>
+            {meta.authorName ? <Text style={styles.author}>{meta.authorName}</Text> : null}
+            {meta.narrator ? <Text style={styles.narrator}>Narrated by {meta.narrator}</Text> : null}
           </View>
-        )}
 
-        {/* Description */}
-        {meta.description ? (
-          <View style={styles.descBlock}>
-            <Text style={styles.descHeading}>About</Text>
-            <Text style={styles.desc}>{meta.description}</Text>
+          {/* Seeker */}
+          <SeekBar
+            current={displayTime}
+            duration={duration}
+            onSeek={async (v) => { await seekSession(v); }}
+          />
+
+          {/* Controls */}
+          <View style={styles.controls}>
+            <TouchableOpacity onPress={() => skipBack(15)} style={styles.controlBtn}>
+              <Ionicons name="play-back" size={28} color={Colors.textPrimary} />
+              <Text style={styles.skipLabel}>15</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={togglePlayPause} style={styles.playBtn}>
+              <Ionicons
+                name={isPlaying && isCurrentItem ? 'pause' : 'play'}
+                size={36}
+                color={Colors.textOnAccent}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => skipForward(30)} style={styles.controlBtn}>
+              <Ionicons name="play-forward" size={28} color={Colors.textPrimary} />
+              <Text style={styles.skipLabel}>30</Text>
+            </TouchableOpacity>
           </View>
-        ) : null}
-      </ScrollView>
-    </View>
+
+          {/* Chapter list */}
+          {isCurrentItem && nowPlaying!.tracks.length > 1 && (
+            <View style={styles.chaptersBlock}>
+              <Text style={styles.chaptersHeading}>Chapters</Text>
+              {nowPlaying!.tracks.map((track, i) => (
+                <TouchableOpacity
+                  key={track.index}
+                  style={[
+                    styles.chapterRow,
+                    i === nowPlaying!.trackIndex && styles.chapterRowActive,
+                  ]}
+                  onPress={() => seekSession(track.startOffset)}
+                >
+                  <Text style={[
+                    styles.chapterTitle,
+                    i === nowPlaying!.trackIndex && styles.chapterTitleActive,
+                  ]} numberOfLines={1}>
+                    {track.title || `Chapter ${i + 1}`}
+                  </Text>
+                  <Text style={styles.chapterDuration}>{formatTime(track.duration)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Description */}
+          {meta.description ? (
+            <View style={styles.descBlock}>
+              <Text style={styles.descHeading}>About</Text>
+              <Text style={styles.desc}>{meta.description}</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+      </View>
+    </>
   );
 }
 
