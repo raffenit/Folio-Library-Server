@@ -134,6 +134,12 @@ export interface SeriesMetadata {
   publicationStatus?: number;
 }
 
+export interface BookTocEntry {
+  title: string;
+  page: number;
+  children?: BookTocEntry[];
+}
+
 export interface ChapterInfo {
   chapterId: number;
   seriesId: number;
@@ -197,15 +203,28 @@ class KavitaAPI {
 
   async initialize() {
     try {
-      // 3. Fallback to Env if storage is empty
+      // 1. Get credentials (prioritize .env for dev stability)
+      const envUrl = process.env.EXPO_PUBLIC_KAVITA_URL;
+      const envKey = process.env.EXPO_PUBLIC_KAVITA_API_KEY;
+      
       const storedUrl = await storage.getItem(STORAGE_KEYS.SERVER_URL);
       const storedKey = await storage.getItem(STORAGE_KEYS.API_KEY);
-      const defaultUrl = process.env.EXPO_PUBLIC_KAVITA_URL || '';
 
-      const finalUrl = storedUrl || defaultUrl;
+      const finalUrl = envUrl || storedUrl;
+      const finalKey = envKey || storedKey;
 
-      if (finalUrl && storedKey) {
-        this.setServer(finalUrl, storedKey);
+      if (finalUrl && finalKey) {
+        this.setServer(finalUrl, finalKey);
+        
+        // 2. Perform the actual authentication exchange
+        // This is what generates the JWT token and stops the 401s
+        const success = await this.login();
+        
+        if (success) {
+          console.log(`✅ Kavita Authenticated: ${this.serverUrl}`);
+        } else {
+          console.warn('⚠️ Kavita credentials found but authentication failed.');
+        }
       }
     } catch (e) {
       console.error('Failed to initialize KavitaAPI', e);
@@ -259,15 +278,29 @@ class KavitaAPI {
   }
 
   async login(): Promise<boolean> {
-    const response = await this.client.post('/api/Plugin/authenticate', null, {
-      params: { apiKey: this.apiKey, pluginName: 'KavitaReaderApp' },
-    });
-    if (response.data?.token) {
-      this.jwtToken = response.data.token;
-      await storage.setItem(STORAGE_KEYS.JWT_TOKEN, this.jwtToken);
-      return true;
+    try {
+      // Use the apiKey to get a JWT
+      const response = await this.client.post('/api/Plugin/authenticate', null, {
+        params: { 
+          apiKey: this.apiKey, 
+          pluginName: 'KavitaReaderApp' 
+        },
+      });
+
+      if (response.data?.token) {
+        this.jwtToken = response.data.token;
+        
+        // CRITICAL: Set the default header so future requests aren't 401
+        this.client.defaults.headers.common['Authorization'] = `Bearer ${this.jwtToken}`;
+        
+        await storage.setItem(STORAGE_KEYS.JWT_TOKEN, this.jwtToken);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Kavita Login Error:', error);
+      return false;
     }
-    return false;
   }
 
   async logout() {
@@ -453,13 +486,14 @@ async getBookInfo(chapterId: number): Promise<KavitaBookInfo> {
 }
 
 async getBookPage(chapterId: number, page: number): Promise<string> {
-  // Added the apiKey parameter here as well
-  const key = this.apiKey; 
-  const url = `/api/Reader/image?bookId=${chapterId}&pageNum=${page}&apiKey=${key}`;
-  const response = await this.client.get(url, {
-    responseType: 'text',
-  });
+  const url = `/api/Book/${chapterId}/book-page?page=${page}&apiKey=${this.apiKey}`;
+  const response = await this.client.get(url, { responseType: 'text' });
   return response.data;
+}
+
+async getBookToc(chapterId: number): Promise<BookTocEntry[]> {
+  const response = await this.client.get(`/api/Book/${chapterId}/chapters`);
+  return Array.isArray(response.data) ? response.data : [];
 }
 
   // ── Reader ──────────────────────────────────────────────────────────────────
@@ -477,26 +511,24 @@ async getChapterInfo(chapterId: number): Promise<ChapterInfo> {
 
 // ── Reading progress ─────────────────────────────────────────────────────────
 
-async saveReadingProgress(chapter: ChapterInfo, page: number) {
-  try {
-    // We pass the apiKey in the query string as a fail-safe for this endpoint
-    const url = `/api/Reader/progress?apiKey=${this.apiKey}`;
-    
-    await this.client.post(url, {
-      libraryId: chapter.libraryId,
-      seriesId: chapter.seriesId,
-      volumeId: chapter.volumeId,
-      chapterId: chapter.chapterId,
-      pageNum: page,
+  async saveReadingProgress(chapter: any, page: number) {
+    if (!chapter?.chapterId) return;
+
+    const payload = {
+      // DO NOT wrap in progressDto yet—most Kavita versions want it flat 
+      // but they CRITICALY want numbers, not strings.
+      libraryId: parseInt(chapter.libraryId, 10),
+      seriesId: parseInt(chapter.seriesId, 10),
+      volumeId: parseInt(chapter.volumeId, 10),
+      chapterId: parseInt(chapter.chapterId, 10),
+      pageNum: parseInt(page.toString(), 10),
       isRead: false
-    });
-  } catch (err) {
-    const axiosError = err as any;
-    if (axiosError.response) {
-      console.error('Kavita Progress Validation Error:', axiosError.response.data);
-    }
+    };
+
+    await this.client.post(`/api/Reader/progress?apiKey=${this.apiKey}`, payload);
+  } catch (err: any) {
+    console.error('Kavita Progress Sync Failed:', err.response?.data || err.message);
   }
-}
 
   // ── File health ──────────────────────────────────────────────────────────────
 

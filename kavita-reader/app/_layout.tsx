@@ -10,57 +10,63 @@ import { MiniPlayer } from '../components/MiniPlayer';
 import { kavitaAPI } from '../services/kavitaAPI';
 import { absAPI } from '../services/audiobookshelfAPI';
 import { useState, useEffect } from 'react';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { storage } from '../services/storage';
- 
-const [isReady, setIsReady] = useState(false);
-const [showLogin, setShowLogin] = useState(true);
 
 export default function RootLayout() {
-  setIsReady(false);
-  setShowLogin(true);
+  // 1. STATES MUST BE INSIDE THE COMPONENT
+  const [isReady, setIsReady] = useState(false);
+  const [showLogin, setShowLogin] = useState(true);
+
   const segments = useSegments();
   const router = useRouter();
 
+  // 2. INITIALIZATION (Runs once on mount)
   useEffect(() => {
-    const bootApp = async () => {
-      // 1. Initialize your APIs
+  const bootApp = async () => {
+    try {
+      // 1. Initialize APIs
       await kavitaAPI.initialize();
       await absAPI.initialize();
 
-      // 2. Check .env variables (Your "Developer Mode" bypass)
-      const hasKavita = !!(process.env.EXPO_PUBLIC_KAVITA_URL && process.env.EXPO_PUBLIC_KAVITA_API_KEY);
-      const hasAbs = !!(process.env.EXPO_PUBLIC_ABS_URL && process.env.EXPO_PUBLIC_ABS_TOKEN);
+      // 2. Explicitly check .env variables to set the flag
+      // Make sure these match your .env keys EXACTLY
+      const hasKavitaEnv = !!(process.env.EXPO_PUBLIC_KAVITA_URL && process.env.EXPO_PUBLIC_KAVITA_API_KEY);
+      const hasAbsEnv = !!(process.env.EXPO_PUBLIC_ABS_URL && process.env.EXPO_PUBLIC_ABS_TOKEN);
 
-      if (hasKavita || hasAbs) {
-        setShowLogin(false); // Bypasses the login screen
+      // 3. Update the state that controls the redirect
+      if (hasKavitaEnv || hasAbsEnv) {
+        setShowLogin(false);
       } else {
-        // Optional: Check if they have a saved manual login in storage
-        const hasStored = await storage.getItem('server_url');
+        // Fallback: Check storage if no .env is found
+        const hasStored = await storage.getItem('kavita_server_url');
         if (hasStored) setShowLogin(false);
       }
-
+    } catch (e) {
+      console.error("Boot error:", e);
+    } finally {
+      // 4. Only after EVERYTHING is set do we allow the app to render
       setIsReady(true);
-    };
+    }
+  };
 
-    bootApp();
-  }, []);
+  bootApp();
+}, []);
 
-  // 3. Navigation Guard
+  // 3. NAVIGATION GUARD (Bypass/Login Redirects)
   useEffect(() => {
     if (!isReady) return;
 
     const inAuthGroup = segments[0] === '(auth)';
 
     if (showLogin && !inAuthGroup) {
-      // Redirect to login if they aren't authenticated
       router.replace('/(auth)/login');
     } else if (!showLogin && inAuthGroup) {
-      // Redirect to main app if they ARE authenticated
       router.replace('/(tabs)');
     }
   }, [isReady, showLogin, segments]);
 
+  // 4. LOADING SPINNER
   if (!isReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0d0d12' }}>
@@ -68,7 +74,7 @@ export default function RootLayout() {
       </View>
     );
   }
-  //return <Slot />;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
@@ -82,48 +88,8 @@ export default function RootLayout() {
   );
 }
 
+// 5. INNER NAVIGATION (Handles the actual Stack)
 function RootLayoutNav() {
-
-  const { isAuthenticated, isLoading } = useAuth();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    const bootApp = async () => {
-      await kavitaAPI.initialize();
-      await absAPI.initialize();
-
-      // Check if either service is configured via .env
-      const hasKavita = !!(process.env.EXPO_PUBLIC_KAVITA_URL && process.env.EXPO_PUBLIC_KAVITA_API_KEY);
-      const hasAbs = !!(process.env.EXPO_PUBLIC_ABS_URL && process.env.EXPO_PUBLIC_ABS_TOKEN);
-
-      if (hasKavita || hasAbs) {
-        setShowLogin(false); // Skip to Main App
-      }
-      setIsReady(true);
-    };
-    bootApp();
-  }, []);
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const inAuthGroup = segments[0] === '(auth)';
-    if (!isAuthenticated && !inAuthGroup) {
-      router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace('/(tabs)');
-    }
-  }, [isAuthenticated, isLoading, segments]);
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator color={Colors.accent} size="large" />
-      </View>
-    );
-  }
-
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
@@ -161,10 +127,7 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
-      {/* MiniPlayer sits above all screens so audio persists across navigation */}
       <MiniPlayer />
     </>
   );
 }
-
-

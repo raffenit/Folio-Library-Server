@@ -171,11 +171,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.lg,
     shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 12,
   },
+
   logoMark: {
     fontSize: 36,
     fontWeight: Typography.bold,

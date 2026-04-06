@@ -1,212 +1,370 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  StatusBar,
-  Platform,
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, StatusBar, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { kavitaAPI, ChapterInfo } from '../../services/kavitaAPI';
-import { Colors, Typography, Spacing, Radius } from '../../constants/theme';
+import { kavitaAPI, BookTocEntry } from '../../services/kavitaAPI';
+import { Colors } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
-const THEMES = {
-  dark:  { bg: '#1a1a22', text: '#e8e0d0', link: '#e8a838' },
-  sepia: { bg: '#f4ecd8', text: '#3b2e1e', link: '#8b6340' },
-  light: { bg: '#ffffff', text: '#1a1a1a', link: '#2563eb' },
-};
-type ThemeName = 'dark' | 'sepia' | 'light';
+interface BuildOptions {
+  serverUrl: string;
+  chapterId: number;
+  apiKey: string;
+}
 
-function buildPageHtml(rawHtml: string, theme: typeof THEMES.dark, baseHref: string): string {
-  // Rewrite protocol-relative URLs like //host:port/api/book/ → /api/book/
-  const rewritten = rawHtml.replace(/\/\/[^/"'\s]+?(\/api\/book\/)/g, '$1');
-  return `<!DOCTYPE html><html><head>
+function buildPageHtml(rawHtml: string, { serverUrl, chapterId, apiKey }: BuildOptions): string {
+  // Kavita returns a full HTML document — extract just the body content
+  const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const rawContent = bodyMatch
+    ? bodyMatch[1]
+    : rawHtml
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+        .replace(/<\/?(html|body)[^>]*>/gi, '')
+        .trim();
+
+  // Rewrite relative resource URLs (src/href="book-resources?file=...") to
+  // absolute Kavita URLs. Without this the iframe resolves them against the
+  // dev-server origin and they time out, breaking layout measurement.
+  const base = `${serverUrl}/api/Book/${chapterId}`;
+  const cleanContent = rawContent.replace(
+    /(src|href)="(book-resources\?[^"]*)"/gi,
+    (_m, attr, path) => `${attr}="${base}/${path}&apiKey=${apiKey}"`
+  );
+
+  return `<!DOCTYPE html>
+<html>
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=3">
-<base href="${baseHref}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-*{box-sizing:border-box}
-html{background:${theme.bg};-webkit-text-size-adjust:100%}
-body{margin:0 auto;padding:24px 20px 60px;background:${theme.bg};color:${theme.text};
-  font-family:Georgia,"Times New Roman",serif;font-size:18px;line-height:1.75;max-width:680px}
-a{color:${theme.link}}
-img{max-width:100%;height:auto;display:block;margin:1em auto}
-p{margin:0 0 1em}
-h1,h2,h3,h4,h5,h6{color:${theme.text};line-height:1.3;margin:1.2em 0 .5em}
-blockquote{border-left:3px solid ${theme.link};margin:1em 0;padding-left:1em;opacity:.85}
-pre,code{background:rgba(128,128,128,.15);border-radius:4px;padding:.1em .3em;font-size:.9em}
-</style></head><body>${rewritten}</body></html>`;
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%; width: 100%;
+    background-color: #0d0d12;
+    overflow: hidden;
+  }
+
+  /* ── PHONE: single column, vertical scroll ── */
+  @media (max-width: 767px) {
+    body { overflow-y: auto; overflow-x: hidden; }
+    #clip { position: static; }
+    #book-content {
+      height: auto;
+      padding: 24px 20px;
+      column-count: 1;
+      overflow: visible;
+    }
+  }
+
+  /* ── TABLET / DESKTOP: two-column horizontal page-flip ── */
+  @media (min-width: 768px) {
+    /*
+     * #clip is an absolutely-positioned window that sits 60px inset from each
+     * side. This gives every "page" consistent margins without relying on
+     * multicol container padding (which only applies to the first page).
+     */
+    #clip {
+      position: absolute;
+      top: 0; bottom: 0;
+      left: 60px; right: 60px;
+      overflow: hidden;
+    }
+    #book-content {
+      height: 100%;
+      padding: 40px 0;      /* vertical breathing room only */
+      column-count: 2;
+      column-gap: 60px;
+      column-fill: auto;
+      will-change: transform;
+      transition: transform 0.25s ease;
+    }
+  }
+
+  #book-content {
+    color: #e2e2e2;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 18px;
+    line-height: 1.7;
+    text-align: justify;
+  }
+  p { margin: 0 0 1em 0; }
+  img {
+    max-width: 100%;
+    height: auto;
+    break-inside: avoid;
+    display: block;
+    margin: 10px auto;
+    filter: brightness(0.85);
+  }
+  a { color: #c8c8c8; }
+  body::-webkit-scrollbar { display: none; }
+</style>
+<script>
+  window.__isPhone = function() { return window.innerWidth < 768; };
+
+  function __getStride() {
+    var c = document.getElementById('book-content');
+    var gap = parseFloat(getComputedStyle(c).columnGap) || 0;
+    return Math.round(c.offsetWidth + gap);
+  }
+
+  window.__goToPage = function(n) {
+    var c = document.getElementById('book-content');
+    c.style.transform = 'translateX(-' + (n * __getStride()) + 'px)';
+  };
+
+  window.__getPageCount = function() {
+    var c = document.getElementById('book-content');
+    var stride = __getStride();
+    return Math.max(1, Math.ceil(c.scrollWidth / stride));
+  };
+
+  /*
+   * Poll with rAF until scrollWidth is stable for 3 consecutive frames,
+   * then fire callback(pageCount). Handles slow multicol reflow reliably
+   * without a fixed timeout.
+   */
+  window.__measurePages = function(callback) {
+    var last = -1;
+    var stable = 0;
+    var iters = 0;
+    function check() {
+      var count = window.__getPageCount();
+      iters++;
+      if (count === last) {
+        stable++;
+        if (stable >= 3 || iters >= 120) { callback(count); return; }
+      } else {
+        stable = 0;
+        last = count;
+      }
+      requestAnimationFrame(check);
+    }
+    requestAnimationFrame(check);
+  };
+</script>
+</head>
+<body>
+  <div id="clip">
+    <div id="book-content">${cleanContent}</div>
+  </div>
+</body>
+</html>`;
 }
 
 export default function EpubReaderScreen() {
-  const params = useLocalSearchParams<{
-    chapterId: string;
-    title: string;
-    seriesId: string;
-    volumeId: string;
-    libraryId: string; // Ensure this is captured from the search/params
-  }>();
+  const params = useLocalSearchParams<{ chapterId: string; title: string }>();
   const chapterId = Number(params.chapterId);
-
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [rawHtml, setRawHtml] = useState('');
-  const [theme, setTheme] = useState<ThemeName>('dark');
-  
-  // 1. New State to hold our "ID Suitcase"
-  const [chapterInfo, setChapterInfo] = useState<ChapterInfo | null>(null);
+  const [visualPage, setVisualPage] = useState(0);
+  const [totalVisualPages, setTotalVisualPages] = useState(1);
+  const measuringRef = useRef(false);
+  const [iframeFocused, setIframeFocused] = useState(false);
+  const [toc, setToc] = useState<BookTocEntry[]>([]);
 
-  const kavitaProxy = kavitaAPI.getServerUrl(); 
-  const pageUrl = kavitaAPI.getPdfPageImageUrl(chapterId, currentPage);
-  
-  // BaseHref for relative images inside the EPUB HTML
-  const baseHref = `${kavitaProxy}/api/Reader/image-proxy/${chapterId}/`;
+  const pageHtml = rawHtml ? buildPageHtml(rawHtml, {
+    serverUrl: kavitaAPI.getServerUrl(),
+    chapterId,
+    apiKey: kavitaAPI.getApiKey(),
+  }) : '';
 
-  const pageHtml = rawHtml ? buildPageHtml(rawHtml, THEMES[theme], baseHref) : '';
-
-  // 2. Updated loadPage to use the chapterInfo object for progress
-  async function loadPage(page: number) {
+  const loadPage = useCallback(async (page: number) => {
+    if (page < 0 || (totalPages > 0 && page >= totalPages)) return;
     setLoading(true);
-    setError('');
+    measuringRef.current = true;
+    setVisualPage(0);
+    setTotalVisualPages(1);
     try {
       const html = await kavitaAPI.getBookPage(chapterId, page);
       setRawHtml(html);
       setCurrentPage(page);
-
-      // Only save progress if we successfully fetched the chapter metadata
-      if (chapterInfo) {
-        kavitaAPI.saveReadingProgress(chapterInfo, page);
-      }
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to load page');
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  }
+  }, [chapterId, totalPages]);
 
   useEffect(() => {
     (async () => {
-      const info = await kavitaAPI.getChapterInfo(chapterId);
-      setChapterInfo(info);
-      // Resume logic
-      if (info?.lastReadPage) setCurrentPage(info.lastReadPage);
+      try {
+        const [info, tocData] = await Promise.all([
+          kavitaAPI.getChapterInfo(chapterId),
+          kavitaAPI.getBookToc(chapterId),
+        ]);
+        setTotalPages(info.pages || 0);
+        setToc(tocData);
+        await loadPage(info.lastReadPage ?? 0);
+      } catch (e) { console.error(e); }
     })();
   }, [chapterId]);
 
-  function goToPage(page: number) {
-    setCurrentPage(page);
-    if (chapterInfo) {
-      kavitaAPI.saveReadingProgress(chapterInfo, page);
+  // Flatten nested TOC entries and find the title for the current page
+  const currentSectionTitle = (() => {
+    if (!toc.length) return null;
+    const flat: BookTocEntry[] = [];
+    const walk = (entries: BookTocEntry[]) => {
+      for (const e of entries) {
+        flat.push(e);
+        if (e.children?.length) walk(e.children);
+      }
+    };
+    walk(toc);
+    const sorted = flat.slice().sort((a, b) => a.page - b.page);
+    let match = sorted[0];
+    for (const entry of sorted) {
+      if (entry.page <= currentPage) match = entry;
+      else break;
     }
-  }
+    return match?.title ?? null;
+  })();
 
-  function cycleTheme() {
-    const order: ThemeName[] = ['dark', 'sepia', 'light'];
-    setTheme(prev => order[(order.indexOf(prev) + 1) % order.length]);
-  }
+  const getIframeWin = (): any => {
+    if (Platform.OS !== 'web') return null;
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement | null;
+    return iframe?.contentWindow ?? null;
+  };
 
-  const themeIcon = { dark: 'moon' as const, sepia: 'cafe' as const, light: 'sunny' as const }[theme];
-  const t = THEMES[theme];
+  const focusIframe = () => {
+    if (Platform.OS !== 'web') return;
+    const iframe = document.querySelector('iframe') as HTMLIFrameElement | null;
+    iframe?.contentWindow?.focus();
+  };
 
-  if (error && !loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: t.bg }]}>
-        <View style={styles.errorCenter}>
-          <Ionicons name="alert-circle-outline" size={40} color={Colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={() => router.back()} style={styles.goBack}>
-            <Text style={styles.goBackText}>← Go back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  const handleNext = () => {
+    const win = getIframeWin();
+    if (!win) return;
+    if (win.__isPhone?.()) {
+      if (!measuringRef.current) loadPage(currentPage + 1);
+      return;
+    }
+    const liveCount: number = win.__getPageCount?.() ?? 1;
+    setTotalVisualPages(liveCount);
+    if (visualPage < liveCount - 1) {
+      const next = visualPage + 1;
+      win.__goToPage(next);
+      setVisualPage(next);
+    } else if (!measuringRef.current) {
+      loadPage(currentPage + 1);
+    }
+  };
 
-  const canPrev = currentPage > 0 && !loading;
-  const canNext = currentPage < totalPages - 1 && !loading;
-  const progressPct = totalPages > 0 ? ((currentPage + 1) / totalPages) * 100 : 0;
+  const handlePrev = () => {
+    const win = getIframeWin();
+    if (!win) return;
+    if (win.__isPhone?.()) {
+      if (!measuringRef.current) loadPage(currentPage - 1);
+      return;
+    }
+    const liveCount: number = win.__getPageCount?.() ?? 1;
+    setTotalVisualPages(liveCount);
+    if (visualPage > 0) {
+      const prev = visualPage - 1;
+      win.__goToPage(prev);
+      setVisualPage(prev);
+    } else if (!measuringRef.current) {
+      loadPage(currentPage - 1);
+    }
+  };
+
+  // Arrow key navigation — deps include visual page state so handlers stay fresh
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'ArrowLeft') handlePrev();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [currentPage, totalPages, visualPage, totalVisualPages, loading]);
 
   return (
-    <View style={[styles.container, { backgroundColor: t.bg }]}>
+    <View style={styles.container}>
       <StatusBar hidden />
-
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{params.title || 'Reader'}</Text>
-        <TouchableOpacity style={styles.headerBtn} onPress={cycleTheme}>
-          <Ionicons name={themeIcon} size={20} color={Colors.accent} />
-        </TouchableOpacity>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.headerTitle} numberOfLines={1}>{params.title}</Text>
+          {currentSectionTitle && (
+            <Text style={styles.headerSubtitle} numberOfLines={1}>{currentSectionTitle}</Text>
+          )}
+        </View>
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Page content */}
-      <View style={styles.contentArea}>
+      <View style={[styles.contentArea, iframeFocused && styles.contentAreaFocused]}>
         {Platform.OS === 'web' ? (
-          // @ts-ignore — iframe is a valid DOM element in React Native Web
           <iframe
             srcDoc={pageHtml}
+            key={`reader-${currentPage}`}
+            onLoad={(e) => {
+              const win = e.currentTarget.contentWindow as any;
+              if (!win) return;
+              win.addEventListener('focus', () => setIframeFocused(true));
+              win.addEventListener('blur', () => setIframeFocused(false));
+              // Forward arrow keys from inside the iframe to parent handlers
+              win.addEventListener('keydown', (ke: KeyboardEvent) => {
+                if (ke.key === 'ArrowRight' || ke.key === 'ArrowLeft') {
+                  window.dispatchEvent(new KeyboardEvent('keydown', { key: ke.key }));
+                }
+              });
+              // Poll until scrollWidth stabilises, then unlock navigation
+              win.__measurePages?.((count: number) => {
+                setTotalVisualPages(count);
+                measuringRef.current = false;
+                win.focus();
+                setIframeFocused(true);
+              });
+            }}
             style={{
               border: 'none',
               width: '100%',
               height: '100%',
-              display: 'block',
-              backgroundColor: t.bg,
+              backgroundColor: '#0d0d12',
             }}
-            sandbox="allow-scripts allow-same-origin"
-            title="Book page"
           />
-        ) : (
-          <View style={styles.nativePlaceholder}>
-            <Ionicons name="book-outline" size={40} color={Colors.textMuted} />
-            <Text style={styles.nativeText}>
-              EPUB reading is available in the web version of this app.
-            </Text>
+        ) : <Text style={{ color: '#fff' }}>Web Only Reader</Text>}
+
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator color={Colors.accent} size="large" />
           </View>
         )}
       </View>
 
-      {/* Loading overlay */}
-      {loading && (
-        <View style={[styles.loadingOverlay, { backgroundColor: t.bg }]}>
-          <ActivityIndicator color={Colors.accent} size="large" />
-          <Text style={styles.loadingText}>Loading…</Text>
-        </View>
-      )}
-
-      {/* Footer nav */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.navBtn, !canPrev && styles.navBtnDisabled]}
-          onPress={() => loadPage(currentPage - 1)}
-          disabled={!canPrev}
+          onPress={() => { loadPage(currentPage - 1); }}
+          style={styles.navBtn}
         >
-          <Ionicons name="chevron-back" size={24} color={canPrev ? Colors.textPrimary : Colors.textMuted} />
+          <Ionicons name="play-skip-back" size={20} color="#fff" />
         </TouchableOpacity>
 
-        <View style={styles.progressInfo}>
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
-          </View>
-          <Text style={styles.progressText}>
-            {totalPages > 0 ? `${currentPage + 1} / ${totalPages}` : '…'}
+        {/* Tap the center to re-focus arrow key navigation into the reader */}
+        <TouchableOpacity onPress={focusIframe} style={{ alignItems: 'center' }}>
+          <Text style={{ color: '#aaa', fontSize: 11, marginBottom: 2 }}>
+            Page {visualPage + 1} of {totalVisualPages}
           </Text>
-        </View>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
+            Chapter {currentPage + 1} of {totalPages}
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.navBtn, !canNext && styles.navBtnDisabled]}
-          onPress={() => loadPage(currentPage + 1)}
-          disabled={!canNext}
+          onPress={() => { loadPage(currentPage + 1); }}
+          style={styles.navBtn}
         >
-          <Ionicons name="chevron-forward" size={24} color={canNext ? Colors.textPrimary : Colors.textMuted} />
+          <Ionicons name="play-skip-forward" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -214,89 +372,40 @@ export default function EpubReaderScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#0d0d12' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 44,
-    paddingHorizontal: Spacing.base,
-    paddingBottom: Spacing.md,
-    backgroundColor: 'rgba(13,13,18,0.92)',
-    zIndex: 10,
+    padding: 20,
+    paddingTop: 50,
+    backgroundColor: '#1a1a22',
   },
-  headerBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: {
+  headerTitle: { color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: 15 },
+  headerSubtitle: { color: '#aaa', textAlign: 'center', fontSize: 12, marginTop: 2 },
+  contentArea: {
     flex: 1,
-    textAlign: 'center',
-    fontSize: Typography.base,
-    fontWeight: Typography.semibold,
-    color: Colors.textPrimary,
+    width: '100%',
+    backgroundColor: '#0d0d12',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  contentArea: { flex: 1 },
-  nativePlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.xl,
-  },
-  nativeText: {
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    fontSize: Typography.base,
-    lineHeight: 22,
+  contentAreaFocused: {
+    borderColor: '#5b8dd9',
   },
   footer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 30,
-    paddingTop: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: 'rgba(13,13,18,0.92)',
-    gap: Spacing.sm,
-    zIndex: 10,
+    padding: 20,
+    backgroundColor: '#1a1a22',
   },
-  navBtn: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-  },
-  navBtnDisabled: { opacity: 0.4 },
-  progressInfo: { flex: 1, alignItems: 'center', gap: 4 },
-  progressTrack: {
-    width: '100%',
-    height: 3,
-    backgroundColor: Colors.progressTrack,
-    borderRadius: Radius.full,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', backgroundColor: Colors.accent },
-  progressText: { fontSize: Typography.xs, color: Colors.textSecondary },
+  navBtn: { padding: 10, backgroundColor: '#333', borderRadius: 8 },
   loadingOverlay: {
-    position: 'absolute',
-    top: 0, bottom: 0, left: 0, right: 0,
-    zIndex: 20,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(13, 13, 18, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.md,
+    pointerEvents: 'none',
   },
-  loadingText: { fontSize: Typography.base, color: Colors.textSecondary },
-  errorCenter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.xl,
-  },
-  errorText: {
-    fontSize: Typography.base,
-    color: Colors.error,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  goBack: { marginTop: Spacing.sm },
-  goBackText: { color: Colors.accent, fontSize: Typography.base },
 });

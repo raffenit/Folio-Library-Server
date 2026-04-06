@@ -4,8 +4,8 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAudioPlayer } from '../contexts/AudioPlayerContext'; 
 import { useRouter } from 'expo-router';
-import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { absAPI } from '../services/audiobookshelfAPI';
 import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 
@@ -20,10 +20,19 @@ function formatTime(seconds: number): string {
 
 export function MiniPlayer() {
   const router = useRouter();
-  const { nowPlaying, isPlaying, sessionTime, togglePlayPause, skipBack, skipForward, stop } = useAudioPlayer();
+  
+  // 2. This will now have nowPlaying, sessionTime, etc.
+  const { 
+    nowPlaying, 
+    isPlaying, 
+    sessionTime, 
+    togglePlayPause, 
+    skipBack, 
+    skipForward, 
+    stop 
+  } = useAudioPlayer();
 
   if (!nowPlaying) return null;
-
   const { item } = nowPlaying;
   const title = item.media.metadata.title;
   const author = item.media.metadata.authorName ?? '';

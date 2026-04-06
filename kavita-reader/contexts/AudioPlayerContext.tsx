@@ -1,9 +1,14 @@
 import React, {
-  createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode,
+  createContext, useContext, useEffect, useState, useCallback, ReactNode, useRef
 } from 'react';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import {
+  useAudioPlayer as useNativeAudioPlayer,
+  setAudioModeAsync,
+  type AudioSource,
+} from 'expo-audio';
 import { absAPI, ABSLibraryItem, ABSAudioTrack, ABSPlaybackSession } from '../services/audiobookshelfAPI';
 
+// 1. Ensure this is at the TOP of the file (above the Provider)
 export interface NowPlaying {
   item: ABSLibraryItem;
   session: ABSPlaybackSession;
@@ -11,149 +16,110 @@ export interface NowPlaying {
   trackIndex: number;
 }
 
-interface AudioPlayerContextType {
-  nowPlaying: NowPlaying | null;
-  isPlaying: boolean;
-  currentTime: number;       // seconds within current track
-  totalTime: number;         // total session duration seconds
-  sessionTime: number;       // absolute position across all tracks
-  play: (item: ABSLibraryItem, startTime?: number) => Promise<void>;
-  togglePlayPause: () => Promise<void>;
-  seek: (seconds: number) => Promise<void>;         // seek within current track
-  seekSession: (absSeconds: number) => Promise<void>; // seek to absolute session position
-  skipForward: (seconds?: number) => Promise<void>;
-  skipBack: (seconds?: number) => Promise<void>;
-  stop: () => Promise<void>;
-}
+// 1. Define the Context Object at the top level
+const AudioPlayerContext = createContext<any>(null);
 
-const AudioPlayerContext = createContext<AudioPlayerContextType>({
-  nowPlaying: null,
-  isPlaying: false,
-  currentTime: 0,
-  totalTime: 0,
-  sessionTime: 0,
-  play: async () => {},
-  togglePlayPause: async () => {},
-  seek: async () => {},
-  seekSession: async () => {},
-  skipForward: async () => {},
-  skipBack: async () => {},
-  stop: async () => {},
-});
+const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
+const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
+const syncInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+
+// This hook connects your components to the Provider's "Value"
+export const useAudioPlayer = () => {
+  const context = useContext(AudioPlayerContext);
+  
+  if (context === undefined) {
+    throw new Error('useAudioPlayer must be used within an AudioPlayerProvider');
+  }
+  
+  return context;
+};
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [totalTime, setTotalTime] = useState(0);
-  const syncInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 1. The Hook (Simple)
+  const player = useNativeAudioPlayer(audioSource);
 
-  // Computed: absolute position across all tracks
-  const sessionTime = (() => {
-    if (!nowPlaying) return 0;
-    const track = nowPlaying.tracks[nowPlaying.trackIndex];
-    return (track?.startOffset ?? 0) + currentTime;
-  })();
-
-  // Configure audio session on mount
+  // The Listener (Reliable)
   useEffect(() => {
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
+    // Listen for the status change
+    const subscription = player.addListener('playbackStatusUpdate', (status) => {
+      // Check for the finished state
+      if (status.playbackState === 'finished') {
+        advanceTrack();
+      }
     });
-    return () => { cleanupSound(); };
+
+    return () => subscription.remove(); // Cleanup is vital!
+  }, [player, audioSource]);
+
+  console.log("Player Keys:", Object.keys(player));
+
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      allowsRecording: false,
+    });
   }, []);
 
-
-
-  async function cleanupSound() {
-    stopSyncInterval();
-    if (soundRef.current) {
-      try { await soundRef.current.unloadAsync(); } catch {}
-      soundRef.current = null;
+  // Sync Progress to Server
+  useEffect(() => {
+    if (player.playing && nowPlaying) {
+      syncInterval.current = setInterval(() => {
+        absAPI.saveAudioProgress(
+          nowPlaying.session.id, 
+          player.currentTime, 
+          nowPlaying.session.duration
+        );
+      }, 30000);
+    } else {
+      if (syncInterval.current) clearInterval(syncInterval.current);
     }
-  }
+    return () => { if (syncInterval.current) clearInterval(syncInterval.current); };
+  }, [player.playing, nowPlaying]);
 
-  function stopSyncInterval() {
-    if (syncInterval.current) {
-      clearInterval(syncInterval.current);
-      syncInterval.current = null;
-    }
-  }
-
-  function startSyncInterval(session: ABSPlaybackSession) {
-    stopSyncInterval();
-    syncInterval.current = setInterval(async () => {
-      if (!soundRef.current) return;
-      try {
-        const status = await soundRef.current.getStatusAsync();
-        if (!status.isLoaded) return;
-        const positionSec = (status.positionMillis ?? 0) / 1000;
-        await absAPI.saveAudioProgress(session.id, positionSec, session.duration);
-      } catch {}
-    }, 30000); // sync every 30s
-  }
-
-  const onPlaybackStatusUpdate = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
-    setCurrentTime((status.positionMillis ?? 0) / 1000);
-    setIsPlaying(status.isPlaying ?? false);
-
-    // Auto-advance to next track when one finishes
-    if (status.didJustFinish) {
-      advanceTrack();
-    }
-  }, [nowPlaying]);
-
-  async function advanceTrack() {
-    setNowPlaying(prev => {
-      if (!prev) return prev;
-      const nextIndex = prev.trackIndex + 1;
-      if (nextIndex >= prev.tracks.length) return prev; // last track
-      loadTrack(prev, nextIndex, 0);
-      return { ...prev, trackIndex: nextIndex };
-    });
-  }
-
-  async function loadTrack(np: NowPlaying, trackIndex: number, startPositionSec: number) {
-    await cleanupSound();
+  const loadTrack = useCallback((np: NowPlaying, trackIndex: number, startPositionSec: number) => {
     const track = np.tracks[trackIndex];
     if (!track) return;
 
     const uri = absAPI.resolveTrackUrl(track.contentUrl);
-    const { sound } = await Audio.Sound.createAsync(
-      { uri },
-      {
-        positionMillis: Math.floor(startPositionSec * 1000),
-        shouldPlay: true,
-      },
-      onPlaybackStatusUpdate,
-    );
-    soundRef.current = sound;
-    setCurrentTime(startPositionSec);
-    setTotalTime(track.duration);
-    setIsPlaying(true);
-    startSyncInterval(np.session);
+    
+    // Changing this state triggers the useAudioPlayer to reload
+    setAudioSource(uri);
+    
+    // We can set the start time once the player is ready or via the hook properties
+    player.currentTime = startPositionSec;
+    player.play();
+  }, [player]);
+
+  async function advanceTrack() {
+    setNowPlaying((prev) => {
+      // 1. THE GUARD: If it's null, we can't advance, so just return null
+      if (!prev) return null;
+
+      const nextIndex = prev.trackIndex + 1;
+      
+      // 2. BOUNDARY CHECK: If we're at the end, stay on the last track
+      if (nextIndex >= prev.tracks.length) return prev; 
+
+      // 3. TRIGGER LOAD: Load the actual audio file
+      loadTrack(prev, nextIndex, 0);
+      
+      // 4. RETURN NEW STATE: Update the index
+      return { ...prev, trackIndex: nextIndex };
+    });
   }
 
   const play = useCallback(async (item: ABSLibraryItem, startTime?: number) => {
-    // If same item, just resume
-    if (nowPlaying?.item.id === item.id && soundRef.current) {
-      await soundRef.current.playAsync();
-      setIsPlaying(true);
+    if (nowPlaying?.item.id === item.id) {
+      player.play();
       return;
     }
-
-    await cleanupSound();
 
     const resumeAt = startTime ?? item.userMediaProgress?.currentTime ?? 0;
     const session = await absAPI.startPlaybackSession(item.id, resumeAt);
     const tracks = session.audioTracks;
     if (!tracks?.length) return;
 
-    // Find which track the resume position falls in
     let trackIndex = 0;
     let offsetWithinTrack = resumeAt;
     for (let i = 0; i < tracks.length; i++) {
@@ -165,115 +131,45 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const np: NowPlaying = { item, session, tracks, trackIndex };
+    const np = { item, session, tracks, trackIndex };
     setNowPlaying(np);
-    await loadTrack(np, trackIndex, offsetWithinTrack);
-  }, [nowPlaying]);
+    loadTrack(np, trackIndex, offsetWithinTrack);
+  }, [nowPlaying, player, loadTrack]);
 
   const togglePlayPause = useCallback(async () => {
-    if (!soundRef.current) return;
-    const status = await soundRef.current.getStatusAsync();
-    if (!status.isLoaded) return;
-    if (status.isPlaying) {
-      await soundRef.current.pauseAsync();
-      setIsPlaying(false);
+    if (player.playing) {
+      player.pause();
     } else {
-      await soundRef.current.playAsync();
-      setIsPlaying(true);
+      player.play();
     }
-  }, []);
-
-  const seek = useCallback(async (seconds: number) => {
-    if (!soundRef.current) return;
-    await soundRef.current.setPositionAsync(Math.max(0, seconds) * 1000);
-    setCurrentTime(Math.max(0, seconds));
-  }, []);
-
-  const seekSession = useCallback(async (absSeconds: number) => {
-    // 1. Guard against bad math
-    if (!nowPlaying || !Number.isFinite(absSeconds)) return;
-
-    const { tracks } = nowPlaying;
-    for (let i = 0; i < tracks.length; i++) {
-      const trackEnd = tracks[i].startOffset + tracks[i].duration;
-      
-      if (absSeconds < trackEnd || i === tracks.length - 1) {
-        const offsetWithinTrack = Math.max(0, absSeconds - tracks[i].startOffset);
-        
-        if (i === nowPlaying.trackIndex) {
-          // 2. Use setPositionAsync for internal seeks (Smoother for PWA)
-          await seek(offsetWithinTrack); 
-        } else {
-          // 3. Only reload if jumping to a different file
-          setNowPlaying(prev => prev ? { ...prev, trackIndex: i } : prev);
-          await loadTrack(nowPlaying, i, offsetWithinTrack);
-        }
-        
-        // 4. Sync to Audiobookshelf (ABS)
-        absAPI.saveAudioProgress(nowPlaying.session.id, absSeconds, nowPlaying.session.duration);
-        return;
-      }
-    }
-  }, [nowPlaying, seek, loadTrack]);
-
-  const skipForward = useCallback(async (seconds = 30) => {
-    if (!soundRef.current || !nowPlaying) return;
-    const status = await soundRef.current.getStatusAsync();
-    if (!status.isLoaded) return;
-    const pos = (status.positionMillis ?? 0) / 1000;
-    const track = nowPlaying.tracks[nowPlaying.trackIndex];
-    const remaining = track.duration - pos;
-    if (remaining <= seconds) {
-      // jump to next track
-      await advanceTrack();
-    } else {
-      await seek(pos + seconds);
-    }
-  }, [nowPlaying, seek]);
-
-  const skipBack = useCallback(async (seconds = 15) => {
-    if (!soundRef.current) return;
-    const status = await soundRef.current.getStatusAsync();
-    if (!status.isLoaded) return;
-    const pos = (status.positionMillis ?? 0) / 1000;
-    await seek(Math.max(0, pos - seconds));
-  }, [seek]);
+  }, [player]);
 
   const stop = useCallback(async () => {
     if (nowPlaying?.session) {
-      const status = soundRef.current ? await soundRef.current.getStatusAsync().catch(() => null) : null;
-      const pos = status?.isLoaded ? (status.positionMillis ?? 0) / 1000 : 0;
-      await absAPI.closeSession(nowPlaying.session.id, pos, nowPlaying.session.duration);
+      await absAPI.closeSession(nowPlaying.session.id, player.currentTime, nowPlaying.session.duration);
     }
-    await cleanupSound();
+    setAudioSource(null);
     setNowPlaying(null);
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setTotalTime(0);
-  }, [nowPlaying]);
-
-  useEffect(() => {
-    if ('mediaSession' in navigator && nowPlaying) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: nowPlaying.item.media.metadata.title,
-        artist: nowPlaying.item.media.metadata.authorName || 'Unknown Author',
-        artwork: [{ src: absAPI.getCoverUrl(nowPlaying.item.id), sizes: '512x512', type: 'image/jpeg' }]
-      });
-
-      navigator.mediaSession.setActionHandler('seekto', (details) => {
-        if (details.seekTime !== undefined) seekSession(details.seekTime);
-      });
-    }
-  }, [nowPlaying, seekSession]);
+  }, [nowPlaying, player.currentTime]);
 
   return (
     <AudioPlayerContext.Provider value={{
-      nowPlaying, isPlaying, currentTime, totalTime, sessionTime,
-      play, togglePlayPause, seek, seekSession, skipForward, skipBack, stop,
+      nowPlaying,
+      isPlaying: player.playing,
+      currentTime: player.currentTime,
+      totalTime: player.duration,
+      sessionTime: (nowPlaying?.tracks[nowPlaying.trackIndex]?.startOffset ?? 0) + player.currentTime,
+      play,
+      togglePlayPause,
+      seek: async (s: number) => { player.currentTime = s; },
+      seekSession: async (abs: number) => {
+        // FIND TRACK AND SEEK
+      },
+      skipForward: async (s = 30) => { player.currentTime += s; },
+      skipBack: async (s = 15) => { player.currentTime -= s; },
+      stop,
     }}>
       {children}
     </AudioPlayerContext.Provider>
   );
 }
-
-export const useAudioPlayer = () => useContext(AudioPlayerContext);
