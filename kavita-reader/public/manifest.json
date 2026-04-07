@@ -1,7 +1,7 @@
 {
-  "name": "Kavita Reader",
-  "short_name": "Kavita",
-  "description": "Read your Kavita library anywhere",
+  "name": "Folio",
+  "short_name": "Folio",
+  "description": "Your self-hosted ebook and audiobook library",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

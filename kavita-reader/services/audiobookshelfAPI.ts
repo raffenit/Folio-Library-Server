@@ -201,6 +201,27 @@ class AudiobookshelfAPI {
     return { items: res.data.results ?? [], total: res.data.total ?? 0 };
   }
 
+  async searchByTitle(title: string): Promise<ABSLibraryItem | null> {
+    if (!this.hasCredentials()) return null;
+    try {
+      const libraries = await this.getLibraries();
+      for (const lib of libraries) {
+        const res = await this.client.get(`/api/libraries/${lib.id}/search`, {
+          params: { q: title, limit: 5 },
+        });
+        const results: any[] = res.data?.book ?? res.data?.results ?? [];
+        const match = results.find((r: any) => {
+          const t: string = (r.libraryItem?.media?.metadata?.title ?? r.title ?? '').toLowerCase();
+          return t.includes(title.toLowerCase()) || title.toLowerCase().includes(t.split(':')[0].toLowerCase());
+        });
+        if (match) return match.libraryItem ?? match;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async getLibraryItem(itemId: string): Promise<ABSLibraryItem> {
     const res = await this.client.get(`/api/items/${itemId}`, {
       params: { expanded: 1, include: 'progress' },
@@ -211,11 +232,11 @@ class AudiobookshelfAPI {
   /** Open a playback session — ABS tracks position server-side */
   async startPlaybackSession(itemId: string, startTime = 0): Promise<ABSPlaybackSession> {
     const res = await this.client.post(`/api/items/${itemId}/play`, {
-      deviceInfo: { clientName: 'KavitaReader', deviceId: 'kavita-reader-app' },
+      deviceInfo: { clientName: 'Folio', deviceId: 'folio-reader-app' },
       forceDirectPlay: true,
       forceTranscode: false,
       startTime,
-      mediaPlayer: 'kavita-reader',
+      mediaPlayer: 'folio-reader',
     });
     return res.data;
   }

@@ -10,11 +10,21 @@ const distDir = path.join(__dirname, '..', 'dist');
 const publicDir = path.join(__dirname, '..', 'public');
 const indexPath = path.join(distDir, 'index.html');
 
-// --- Copy public/ → dist/ ---
-for (const file of fs.readdirSync(publicDir)) {
-  fs.copyFileSync(path.join(publicDir, file), path.join(distDir, file));
-  console.log(`Copied public/${file} → dist/${file}`);
+// --- Copy public/ → dist/ (recursive) ---
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDir(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+      console.log(`Copied ${srcPath.replace(publicDir + path.sep, 'public/')} → dist/${destPath.replace(distDir + path.sep, '')}`);
+    }
+  }
 }
+copyDir(publicDir, distDir);
 
 // --- Patch index.html ---
 let html = fs.readFileSync(indexPath, 'utf8');
@@ -25,7 +35,7 @@ const pwaTags = `
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Kavita Reader" />
+    <meta name="apple-mobile-web-app-title" content="Folio" />
     <link rel="apple-touch-icon" href="/assets/icon.png" />`;
 
 const swScript = `

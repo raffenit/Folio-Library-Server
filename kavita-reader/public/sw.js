@@ -1,4 +1,4 @@
-const CACHE = 'kavita-reader-v1';
+const CACHE = 'folio-v1';
 
 const APP_SHELL = [
   '/',

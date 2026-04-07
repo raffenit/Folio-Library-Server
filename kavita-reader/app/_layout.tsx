@@ -3,7 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { AudioPlayerProvider } from '../contexts/AudioPlayerContext';
-import { View, ActivityIndicator } from 'react-native';
+import { ThemeProvider } from '../contexts/ThemeContext';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { Colors } from '../constants/theme';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
 import { MiniPlayer } from '../components/MiniPlayer';
@@ -21,6 +22,36 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Inject fonts on web startup.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    // 1. Google Fonts (Libre Baskerville, Roboto, Poppins, Mulish)
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?' +
+      'family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&' +
+      'family=Roboto:wght@400;500;700&' +
+      'family=Poppins:wght@400;500;600;700&' +
+      'family=Mulish:wght@400;500;700&' +
+      'display=swap';
+    document.head.appendChild(link);
+
+    // 2. Self-hosted fonts (file must exist in public/fonts/)
+    const selfHosted = [
+      { name: 'OpenDyslexic', file: '/fonts/OpenDyslexic-Regular.otf',          bold: '/fonts/OpenDyslexic-Bold.otf',         fmt: 'opentype' },
+      { name: 'Bookerly',     file: '/fonts/Bookerly.ttf',                       bold: '/fonts/Bookerly-Bold.ttf',             fmt: 'truetype' },
+      { name: 'Caroni',       file: '/fonts/Caroni-Regular.otf',                 bold: null,                                   fmt: 'opentype' },
+    ];
+
+    const style = document.createElement('style');
+    style.textContent = selfHosted.map(({ name, file, bold, fmt }) => [
+      `@font-face { font-family: '${name}'; src: url('${file}') format('${fmt}'); font-weight: normal; font-style: normal; }`,
+      bold ? `@font-face { font-family: '${name}'; src: url('${bold}') format('${fmt}'); font-weight: bold; font-style: normal; }` : '',
+    ].join('\n')).join('\n');
+    document.head.appendChild(style);
+  }, []);
+
   // 2. INITIALIZATION (Runs once on mount)
   useEffect(() => {
   const bootApp = async () => {
@@ -29,19 +60,8 @@ export default function RootLayout() {
       await kavitaAPI.initialize();
       await absAPI.initialize();
 
-      // 2. Explicitly check .env variables to set the flag
-      // Make sure these match your .env keys EXACTLY
-      const hasKavitaEnv = !!(process.env.EXPO_PUBLIC_KAVITA_URL && process.env.EXPO_PUBLIC_KAVITA_API_KEY);
-      const hasAbsEnv = !!(process.env.EXPO_PUBLIC_ABS_URL && process.env.EXPO_PUBLIC_ABS_TOKEN);
-
-      // 3. Update the state that controls the redirect
-      if (hasKavitaEnv || hasAbsEnv) {
-        setShowLogin(false);
-      } else {
-        // Fallback: Check storage if no .env is found
-        const hasStored = await storage.getItem('kavita_server_url');
-        if (hasStored) setShowLogin(false);
-      }
+      const hasStored = await storage.getItem('kavita_server_url');
+      if (hasStored) setShowLogin(false);
     } catch (e) {
       console.error("Boot error:", e);
     } finally {
@@ -77,6 +97,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
       <AuthProvider>
         <AudioPlayerProvider>
           <StatusBar style="light" />
@@ -84,6 +105,7 @@ export default function RootLayout() {
           <PWAInstallBanner />
         </AudioPlayerProvider>
       </AuthProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

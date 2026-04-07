@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   Image,
   TouchableOpacity,
@@ -27,7 +26,9 @@ import {
   chapterEffectiveFormat,
   pickBestFile,
 } from '../../services/kavitaAPI';
-import { Colors, Typography, Spacing, Radius } from '../../constants/theme';
+import { absAPI, ABSLibraryItem } from '../../services/audiobookshelfAPI';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Typography, Spacing, Radius, type ColorScheme } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 // ── Format helpers ─────────────────────────────────────────────────────────────
@@ -286,6 +287,8 @@ interface EditModalProps {
 }
 
 function EditMetadataModal({ visible, seriesId, seriesName, onClose, onSaved }: EditModalProps) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [metadata, setMetadata] = useState<SeriesMetadata | null>(null);
@@ -297,6 +300,7 @@ function EditMetadataModal({ visible, seriesId, seriesName, onClose, onSaved }: 
   const [editSummary, setEditSummary] = useState('');
   const [genreSearch, setGenreSearch] = useState('');
   const [tagSearch, setTagSearch] = useState('');
+  const tempIdRef = useRef(-1);
 
   useEffect(() => {
     if (visible) load();
@@ -362,7 +366,14 @@ function EditMetadataModal({ visible, seriesId, seriesName, onClose, onSaved }: 
     if (!metadata) return;
     setSaving(true);
     try {
-      await kavitaAPI.updateSeriesMetadata({ ...metadata, summary: editSummary });
+      // Map temp IDs (negative) to 0 so Kavita creates them server-side
+      const cleanedMetadata = {
+        ...metadata,
+        summary: editSummary,
+        genres: metadata.genres.map(g => g.id < 0 ? { ...g, id: 0 } : g),
+        tags: metadata.tags.map(t => t.id < 0 ? { ...t, id: 0 } : t),
+      };
+      await kavitaAPI.updateSeriesMetadata(cleanedMetadata);
       await Promise.all(
         allCollections.map(async (c) => {
           const wasIn = (await kavitaAPI.getSeriesForCollection(c.id)).some(s => s.id === seriesId);
@@ -382,8 +393,30 @@ function EditMetadataModal({ visible, seriesId, seriesName, onClose, onSaved }: 
     }
   }
 
+  function createGenre(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || !metadata) return;
+    const tempId = tempIdRef.current--;
+    const newGenre: Genre = { id: tempId, title: trimmed };
+    setAllGenres(prev => [...prev, newGenre]);
+    setMetadata({ ...metadata, genres: [...metadata.genres, newGenre] });
+    setGenreSearch('');
+  }
+
+  function createTag(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed || !metadata) return;
+    const tempId = tempIdRef.current--;
+    const newTag: Tag = { id: tempId, title: trimmed };
+    setAllTags(prev => [...prev, newTag]);
+    setMetadata({ ...metadata, tags: [...metadata.tags, newTag] });
+    setTagSearch('');
+  }
+
   const filteredGenres = allGenres.filter(g => g.title.toLowerCase().includes(genreSearch.toLowerCase()));
   const filteredTags = allTags.filter(t => t.title.toLowerCase().includes(tagSearch.toLowerCase()));
+  const canCreateGenre = genreSearch.trim().length > 0 && !allGenres.some(g => g.title.toLowerCase() === genreSearch.toLowerCase().trim());
+  const canCreateTag = tagSearch.trim().length > 0 && !allTags.some(t => t.title.toLowerCase() === tagSearch.toLowerCase().trim());
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -478,7 +511,17 @@ function EditMetadataModal({ visible, seriesId, seriesName, onClose, onSaved }: 
                       onPress={() => toggleGenre(g)}
                     />
                   ))}
-                  {filteredGenres.length === 0 && <Text style={styles.noneText}>No genres found.</Text>}
+                  {canCreateGenre && (
+                    <TouchableOpacity
+                      style={styles.createChip}
+                      onPress={() => createGenre(genreSearch)}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="add" size={14} color={Colors.accent} />
+                      <Text style={styles.createChipText}>Create "{genreSearch.trim()}"</Text>
+                    </TouchableOpacity>
+                  )}
+                  {filteredGenres.length === 0 && !canCreateGenre && <Text style={styles.noneText}>No genres found.</Text>}
                 </View>
               </View>
             )}
@@ -500,7 +543,17 @@ function EditMetadataModal({ visible, seriesId, seriesName, onClose, onSaved }: 
                       onPress={() => toggleTag(t)}
                     />
                   ))}
-                  {filteredTags.length === 0 && <Text style={styles.noneText}>No tags found.</Text>}
+                  {canCreateTag && (
+                    <TouchableOpacity
+                      style={styles.createChip}
+                      onPress={() => createTag(tagSearch)}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="add" size={14} color={Colors.accent} />
+                      <Text style={styles.createChipText}>Create "{tagSearch.trim()}"</Text>
+                    </TouchableOpacity>
+                  )}
+                  {filteredTags.length === 0 && !canCreateTag && <Text style={styles.noneText}>No tags found.</Text>}
                 </View>
               </View>
             )}
@@ -529,6 +582,8 @@ function EditMetadataModal({ visible, seriesId, seriesName, onClose, onSaved }: 
 // ── Main Screen ────────────────────────────────────────────────────────────────
 
 export default function SeriesDetailScreen() {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -542,6 +597,7 @@ export default function SeriesDetailScreen() {
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [coverKey, setCoverKey] = useState(0); // bump to force cover re-fetch
   const [coverError, setCoverError] = useState('');
+  const [absMatch, setAbsMatch] = useState<ABSLibraryItem | null | undefined>(undefined); // undefined = searching
 
   useEffect(() => { setCoverError(''); }, [coverKey]);
 
@@ -562,6 +618,16 @@ export default function SeriesDetailScreen() {
   }, [id]);
 
   useEffect(() => { loadData(); }, [id]);
+
+  // Search ABS for a matching audiobook when the series title is known
+  useEffect(() => {
+    if (!detail?.name || !absAPI.hasCredentials()) {
+      setAbsMatch(null);
+      return;
+    }
+    setAbsMatch(undefined);
+    absAPI.searchByTitle(detail.name).then(setAbsMatch);
+  }, [detail?.name]);
 
   function openChapter(chapter: Chapter, volume: Volume, fileOverride?: ChapterFile) {
     // If we see -1000, we know the metadata is stale
@@ -753,6 +819,27 @@ export default function SeriesDetailScreen() {
           </>
         )}
 
+        {/* ── Audiobook suggestion banner ── */}
+        {absMatch && (
+          <TouchableOpacity
+            style={styles.absBanner}
+            activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/audiobook/[id]', params: { id: absMatch.id, title: absMatch.media?.metadata?.title ?? detail.name } })}
+          >
+            <View style={styles.absBannerIcon}>
+              <Ionicons name="headset" size={22} color={Colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.absBannerTitle}>Audiobook available</Text>
+              <Text style={styles.absBannerSub} numberOfLines={1}>
+                {absMatch.media?.metadata?.title ?? detail.name}
+                {absMatch.media?.metadata?.authorName ? ` · ${absMatch.media.metadata.authorName}` : ''}
+              </Text>
+            </View>
+            <Ionicons name="play-circle" size={32} color={Colors.accent} />
+          </TouchableOpacity>
+        )}
+
         {/* ── Chapter list ── */}
         <View style={styles.chaptersSection}>
           <Text style={styles.chaptersHeader}>Chapters</Text>
@@ -851,332 +938,100 @@ export default function SeriesDetailScreen() {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  centered: {
-    flex: 1, backgroundColor: Colors.background,
-    justifyContent: 'center', alignItems: 'center', gap: Spacing.md,
-  },
-  scroll: { paddingBottom: 60 },
-
-  // Back button — floats top-left
-  backButton: {
-    position: 'absolute', top: 52, left: Spacing.base, zIndex: 10,
-    width: 38, height: 38, borderRadius: Radius.full,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-
-  coverErrorText: {
-    position: 'absolute', top: 4, left: 4, right: 4,
-    fontSize: 9, color: Colors.error, backgroundColor: 'rgba(0,0,0,0.8)',
-    padding: 4, borderRadius: 4, zIndex: 10,
-  },
-  // Cover edit overlay
-  coverEditOverlay: {
-    position: 'absolute', bottom: 6, right: 6,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: Radius.full,
-    width: 28, height: 28,
-    justifyContent: 'center', alignItems: 'center',
-  },
-
-  // Cover picker modal
-  coverChooseContainer: {
-    flex: 1,
-    padding: Spacing.xl,
-    gap: Spacing.lg,
-    justifyContent: 'center',
-  },
-  coverOptionBtn: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.xl,
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  coverOptionText: {
-    fontSize: Typography.md, fontWeight: Typography.bold, color: Colors.textPrimary,
-  },
-  coverOptionSub: {
-    fontSize: Typography.sm, color: Colors.textSecondary,
-  },
-  coverError: {
-    fontSize: Typography.sm, color: Colors.error,
-    textAlign: 'center', paddingHorizontal: Spacing.lg,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
-    gap: Spacing.sm,
-  },
-  searchInputFlex: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    fontSize: Typography.base, color: Colors.textPrimary,
-  },
-  searchBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    width: 44, height: 44,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  coverGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: Spacing.base,
-    gap: Spacing.md,
-    paddingBottom: 40,
-  },
-  coverThumbWrap: {
-    width: 100,
-    alignItems: 'center',
-    gap: 4,
-  },
-  coverThumb: {
-    width: 100, height: 140,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.surface,
-  },
-  coverThumbTitle: {
-    fontSize: 10, color: Colors.textSecondary,
-    textAlign: 'center', lineHeight: 14,
-  },
-  uploadingOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(13,13,18,0.7)',
-    justifyContent: 'center', alignItems: 'center', gap: Spacing.md,
-  },
-  uploadingText: { fontSize: Typography.base, color: Colors.textPrimary },
-
-  // Large screen: side-by-side
-  heroRow: {
-    flexDirection: 'row',
-    paddingTop: 60,
-    paddingHorizontal: Spacing.xl,
-    gap: Spacing.xl,
-    alignItems: 'flex-start',
-  },
-  coverSidebarWrap: {
-    width: 200,
-    borderRadius: Radius.md,
-    overflow: 'hidden',
-    flexShrink: 0,
-    position: 'relative',
-  },
-  coverSidebar: {
-    width: 200,
-    height: 280,
-    borderRadius: Radius.md,
-  },
-
-  // Small screen: compact cover
-  coverSmallWrap: {
-    alignItems: 'center',
-    paddingTop: 72,
-    paddingBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
-    position: 'relative',
-  },
-  coverSmall: {
-    width: 140,
-    height: 200,
-    borderRadius: Radius.md,
-  },
-
-  // Meta block
-  metaBlock: {
-    padding: Spacing.base,
-    paddingTop: Spacing.md,
-    gap: Spacing.md,
-  },
-  metaBlockLarge: {
-    flex: 1,
-    paddingTop: 0,
-  },
-  seriesTitle: {
-    fontSize: Typography.xxl, fontWeight: Typography.bold,
-    color: Colors.textPrimary, fontFamily: Typography.serif, lineHeight: 34,
-  },
-  authorText: {
-    fontSize: Typography.md,
-    color: Colors.accent,
-    fontWeight: Typography.semibold,
-    marginTop: -Spacing.xs,
-  },
-  chipScroll: { flexGrow: 0 },
-  metaChip: {
-    backgroundColor: Colors.accentSoft,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    marginRight: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.accent + '44',
-  },
-  metaChipText: { fontSize: Typography.xs, color: Colors.accent, fontWeight: Typography.medium },
-  metaChipTag: { backgroundColor: Colors.surfaceElevated, borderColor: Colors.border },
-  metaChipTagText: { color: Colors.textSecondary },
-  summary: { fontSize: Typography.base, color: Colors.textSecondary, lineHeight: 23 },
-  summaryToggle: { fontSize: Typography.sm, color: Colors.accent, marginTop: 4 },
-  noSummary: { fontSize: Typography.sm, color: Colors.textMuted, fontStyle: 'italic' },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  progressTrack: {
-    flex: 1, height: 4, backgroundColor: Colors.progressTrack,
-    borderRadius: Radius.full, overflow: 'hidden',
-  },
-  progressFill: { height: '100%', backgroundColor: Colors.accent },
-  progressPct: { fontSize: Typography.sm, color: Colors.textSecondary },
-
-  // Read button
-  readButtonContainer: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  readButton: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.base + 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  readButtonText: {
-    fontSize: Typography.md, fontWeight: Typography.bold, color: Colors.textOnAccent,
-    letterSpacing: 0.3,
-  },
-  editBtn: {
-    width: 52,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Chapter list
-  chaptersSection: {
-    paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.xl,
-    gap: 2,
-  },
-  chaptersHeader: {
-    fontSize: Typography.lg, fontWeight: Typography.bold,
-    color: Colors.textPrimary, marginBottom: Spacing.md,
-  },
-  noChapters: { fontSize: Typography.base, color: Colors.textMuted },
-  chapterRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  chapterLeft: { flex: 1, gap: 3 },
-  chapterNum: {
-    fontSize: Typography.base, color: Colors.textPrimary, fontWeight: Typography.medium,
-  },
-  chapterMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' },
-  chapterPages: { fontSize: Typography.sm, color: Colors.textMuted },
-  formatBadge: {
-    backgroundColor: Colors.accent + '22',
-    borderRadius: Radius.sm,
-    paddingHorizontal: 6, paddingVertical: 2,
-    borderWidth: 1, borderColor: Colors.accent + '55',
-  },
-  formatBadgeText: { fontSize: 10, color: Colors.accent, fontWeight: Typography.bold, letterSpacing: 0.5 },
-  altFormatBadge: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 6, paddingVertical: 2,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  altFormatText: { fontSize: 10, color: Colors.textSecondary, fontWeight: Typography.medium, letterSpacing: 0.3 },
-  chapterRight: { alignItems: 'flex-end', paddingLeft: Spacing.md },
-  chapterProgressContainer: { alignItems: 'flex-end', gap: 3 },
-  chapterProgressTrack: {
-    width: 60, height: 4,
-    backgroundColor: Colors.progressTrack, borderRadius: Radius.full, overflow: 'hidden',
-  },
-  chapterProgressFill: { height: '100%', backgroundColor: Colors.accent },
-  chapterProgressText: { fontSize: 10, color: Colors.textSecondary },
-  errorText: { fontSize: Typography.lg, color: Colors.textSecondary },
-  backLink: { fontSize: Typography.base, color: Colors.accent },
-
-  // Edit Modal
-  modalContainer: { flex: 1, backgroundColor: Colors.background },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingTop: Platform.OS === 'ios' ? 56 : 20,
-    paddingHorizontal: Spacing.base,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  modalClose: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  modalTitle: {
-    flex: 1, textAlign: 'center',
-    fontSize: Typography.base, fontWeight: Typography.semibold, color: Colors.textPrimary,
-  },
-  modalSave: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  modalSaveText: { fontSize: Typography.base, fontWeight: Typography.bold, color: Colors.accent },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  tabBtn: {
-    flex: 1, paddingVertical: Spacing.md,
-    alignItems: 'center',
-    borderBottomWidth: 2, borderBottomColor: 'transparent',
-  },
-  tabBtnActive: { borderBottomColor: Colors.accent },
-  tabLabel: { fontSize: Typography.sm, color: Colors.textSecondary, fontWeight: Typography.medium },
-  tabLabelActive: { color: Colors.accent, fontWeight: Typography.bold },
-  modalScroll: { flex: 1 },
-  modalScrollContent: { padding: Spacing.base, paddingBottom: 40 },
-  infoTab: { gap: Spacing.lg },
-  fieldLabel: {
-    fontSize: Typography.sm, fontWeight: Typography.semibold,
-    color: Colors.textSecondary, textTransform: 'uppercase',
-    letterSpacing: 0.8, marginBottom: Spacing.xs,
-  },
-  summaryInput: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    fontSize: Typography.base, color: Colors.textPrimary,
-    minHeight: 120, textAlignVertical: 'top',
-  },
-  searchInput: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    fontSize: Typography.base, color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-  },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  chip: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  chipSelected: { backgroundColor: Colors.accentSoft, borderColor: Colors.accent },
-  chipText: { fontSize: Typography.sm, color: Colors.textSecondary, fontWeight: Typography.medium },
-  chipTextSelected: { color: Colors.accent },
-  noneText: { fontSize: Typography.sm, color: Colors.textMuted, fontStyle: 'italic' },
-});
+function makeStyles(c: ColorScheme) {
+  return {
+    container: { flex: 1, backgroundColor: c.background },
+    centered: { flex: 1, backgroundColor: c.background, justifyContent: 'center' as const, alignItems: 'center' as const, gap: Spacing.md },
+    scroll: { paddingBottom: 60 },
+    backButton: { position: 'absolute' as const, top: 52, left: Spacing.base, zIndex: 10, width: 38, height: 38, borderRadius: Radius.full, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center' as const, alignItems: 'center' as const },
+    coverErrorText: { position: 'absolute' as const, top: 4, left: 4, right: 4, fontSize: 9, color: c.error, backgroundColor: 'rgba(0,0,0,0.8)', padding: 4, borderRadius: 4, zIndex: 10 },
+    coverEditOverlay: { position: 'absolute' as const, bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: Radius.full, width: 28, height: 28, justifyContent: 'center' as const, alignItems: 'center' as const },
+    coverChooseContainer: { flex: 1, padding: Spacing.xl, gap: Spacing.lg, justifyContent: 'center' as const },
+    coverOptionBtn: { backgroundColor: c.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: c.border, padding: Spacing.xl, alignItems: 'center' as const, gap: Spacing.sm },
+    coverOptionText: { fontSize: Typography.md, fontWeight: Typography.bold as any, color: c.textPrimary },
+    coverOptionSub: { fontSize: Typography.sm, color: c.textSecondary },
+    coverError: { fontSize: Typography.sm, color: c.error, textAlign: 'center' as const, paddingHorizontal: Spacing.lg },
+    searchRow: { flexDirection: 'row' as const, paddingHorizontal: Spacing.base, paddingVertical: Spacing.md, gap: Spacing.sm },
+    searchInputFlex: { flex: 1, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: Typography.base, color: c.textPrimary },
+    searchBtn: { backgroundColor: c.accent, borderRadius: Radius.md, width: 44, height: 44, justifyContent: 'center' as const, alignItems: 'center' as const },
+    coverGrid: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, paddingHorizontal: Spacing.base, gap: Spacing.md, paddingBottom: 40 },
+    coverThumbWrap: { width: 100, alignItems: 'center' as const, gap: 4 },
+    coverThumb: { width: 100, height: 140, borderRadius: Radius.sm, backgroundColor: c.surface },
+    coverThumbTitle: { fontSize: 10, color: c.textSecondary, textAlign: 'center' as const, lineHeight: 14 },
+    uploadingOverlay: { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(13,13,18,0.7)', justifyContent: 'center' as const, alignItems: 'center' as const, gap: Spacing.md },
+    uploadingText: { fontSize: Typography.base, color: c.textPrimary },
+    heroRow: { flexDirection: 'row' as const, paddingTop: 60, paddingHorizontal: Spacing.xl, gap: Spacing.xl, alignItems: 'flex-start' as const },
+    coverSidebarWrap: { width: 200, borderRadius: Radius.md, overflow: 'hidden' as const, flexShrink: 0, position: 'relative' as const },
+    coverSidebar: { width: 200, height: 280, borderRadius: Radius.md },
+    coverSmallWrap: { alignItems: 'center' as const, paddingTop: 72, paddingBottom: Spacing.lg, backgroundColor: c.surface, position: 'relative' as const },
+    coverSmall: { width: 140, height: 200, borderRadius: Radius.md },
+    metaBlock: { padding: Spacing.base, paddingTop: Spacing.md, gap: Spacing.md },
+    metaBlockLarge: { flex: 1, paddingTop: 0 },
+    seriesTitle: { fontSize: Typography.xxl, fontWeight: Typography.bold as any, color: c.textPrimary, fontFamily: Typography.serif, lineHeight: 34 },
+    authorText: { fontSize: Typography.md, color: c.accent, fontWeight: Typography.semibold as any, marginTop: -Spacing.xs },
+    chipScroll: { flexGrow: 0 },
+    metaChip: { backgroundColor: c.accentSoft, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 4, marginRight: Spacing.xs, borderWidth: 1, borderColor: c.accent + '44' },
+    metaChipText: { fontSize: Typography.xs, color: c.accent, fontWeight: Typography.medium as any },
+    metaChipTag: { backgroundColor: c.surfaceElevated, borderColor: c.border },
+    metaChipTagText: { color: c.textSecondary },
+    summary: { fontSize: Typography.base, color: c.textSecondary, lineHeight: 23 },
+    summaryToggle: { fontSize: Typography.sm, color: c.accent, marginTop: 4 },
+    noSummary: { fontSize: Typography.sm, color: c.textMuted, fontStyle: 'italic' as const },
+    progressRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.sm },
+    progressTrack: { flex: 1, height: 4, backgroundColor: c.progressTrack, borderRadius: Radius.full, overflow: 'hidden' as const },
+    progressFill: { height: '100%' as any, backgroundColor: c.accent },
+    progressPct: { fontSize: Typography.sm, color: c.textSecondary },
+    readButtonContainer: { flexDirection: 'row' as const, gap: Spacing.sm },
+    readButton: { flex: 1, flexDirection: 'row' as const, backgroundColor: c.accent, borderRadius: Radius.md, paddingVertical: Spacing.base + 2, alignItems: 'center' as const, justifyContent: 'center' as const, shadowColor: c.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 },
+    readButtonText: { fontSize: Typography.md, fontWeight: Typography.bold as any, color: c.textOnAccent, letterSpacing: 0.3 },
+    editBtn: { width: 52, backgroundColor: c.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: c.border, alignItems: 'center' as const, justifyContent: 'center' as const },
+    absBanner: { flexDirection: 'row' as const, alignItems: 'center' as const, marginHorizontal: Spacing.base, marginTop: Spacing.lg, paddingVertical: Spacing.md, paddingHorizontal: Spacing.base, backgroundColor: c.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: c.accent, gap: Spacing.md },
+    absBannerIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.accentSoft, justifyContent: 'center' as const, alignItems: 'center' as const },
+    absBannerTitle: { fontSize: Typography.sm, fontWeight: Typography.bold as any, color: c.textPrimary },
+    absBannerSub: { fontSize: Typography.xs, color: c.textSecondary, marginTop: 2 },
+    chaptersSection: { paddingHorizontal: Spacing.base, paddingTop: Spacing.xl, gap: 2 },
+    chaptersHeader: { fontSize: Typography.lg, fontWeight: Typography.bold as any, color: c.textPrimary, marginBottom: Spacing.md },
+    noChapters: { fontSize: Typography.base, color: c.textMuted },
+    chapterRow: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: c.border },
+    chapterLeft: { flex: 1, gap: 3 },
+    chapterNum: { fontSize: Typography.base, color: c.textPrimary, fontWeight: Typography.medium as any },
+    chapterMeta: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.sm, flexWrap: 'wrap' as const },
+    chapterPages: { fontSize: Typography.sm, color: c.textMuted },
+    formatBadge: { backgroundColor: c.accent + '22', borderRadius: Radius.sm, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: c.accent + '55' },
+    formatBadgeText: { fontSize: 10, color: c.accent, fontWeight: Typography.bold as any, letterSpacing: 0.5 },
+    altFormatBadge: { backgroundColor: c.surface, borderRadius: Radius.sm, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: c.border },
+    altFormatText: { fontSize: 10, color: c.textSecondary, fontWeight: Typography.medium as any, letterSpacing: 0.3 },
+    chapterRight: { alignItems: 'flex-end' as const, paddingLeft: Spacing.md },
+    chapterProgressContainer: { alignItems: 'flex-end' as const, gap: 3 },
+    chapterProgressTrack: { width: 60, height: 4, backgroundColor: c.progressTrack, borderRadius: Radius.full, overflow: 'hidden' as const },
+    chapterProgressFill: { height: '100%' as any, backgroundColor: c.accent },
+    chapterProgressText: { fontSize: 10, color: c.textSecondary },
+    errorText: { fontSize: Typography.lg, color: c.textSecondary },
+    backLink: { fontSize: Typography.base, color: c.accent },
+    modalContainer: { flex: 1, backgroundColor: c.background },
+    modalHeader: { flexDirection: 'row' as const, alignItems: 'center' as const, paddingTop: Platform.OS === 'ios' ? 56 : 20, paddingHorizontal: Spacing.base, paddingBottom: Spacing.md, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: c.surface },
+    modalClose: { width: 40, height: 40, justifyContent: 'center' as const, alignItems: 'center' as const },
+    modalTitle: { flex: 1, textAlign: 'center' as const, fontSize: Typography.base, fontWeight: Typography.semibold as any, color: c.textPrimary },
+    modalSave: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+    modalSaveText: { fontSize: Typography.base, fontWeight: Typography.bold as any, color: c.accent },
+    tabBar: { flexDirection: 'row' as const, backgroundColor: c.surface, borderBottomWidth: 1, borderBottomColor: c.border },
+    tabBtn: { flex: 1, paddingVertical: Spacing.md, alignItems: 'center' as const, borderBottomWidth: 2, borderBottomColor: 'transparent' as any },
+    tabBtnActive: { borderBottomColor: c.accent },
+    tabLabel: { fontSize: Typography.sm, color: c.textSecondary, fontWeight: Typography.medium as any },
+    tabLabelActive: { color: c.accent, fontWeight: Typography.bold as any },
+    modalScroll: { flex: 1 },
+    modalScrollContent: { padding: Spacing.base, paddingBottom: 40 },
+    infoTab: { gap: Spacing.lg },
+    fieldLabel: { fontSize: Typography.sm, fontWeight: Typography.semibold as any, color: c.textSecondary, textTransform: 'uppercase' as const, letterSpacing: 0.8, marginBottom: Spacing.xs },
+    summaryInput: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: Typography.base, color: c.textPrimary, minHeight: 120, textAlignVertical: 'top' as const },
+    searchInput: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: Typography.base, color: c.textPrimary, marginBottom: Spacing.md },
+    chipRow: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: Spacing.sm },
+    chip: { backgroundColor: c.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2, borderWidth: 1, borderColor: c.border },
+    chipSelected: { backgroundColor: c.accentSoft, borderColor: c.accent },
+    chipText: { fontSize: Typography.sm, color: c.textSecondary, fontWeight: Typography.medium as any },
+    chipTextSelected: { color: c.accent },
+    noneText: { fontSize: Typography.sm, color: c.textMuted, fontStyle: 'italic' as const },
+    createChip: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 4, backgroundColor: c.accentSoft, borderWidth: 1, borderColor: c.accent, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 5 },
+    createChipText: { fontSize: Typography.sm, color: c.accent, fontWeight: Typography.medium as any },
+  };
+}

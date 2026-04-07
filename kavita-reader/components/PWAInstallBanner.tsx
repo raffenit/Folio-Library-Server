@@ -19,7 +19,7 @@ export function PWAInstallBanner() {
             </Text>
           ) : (
             <Text style={styles.subtitle}>
-              Install Kavita Reader for offline access
+              Install Folio for offline access
             </Text>
           )}
         </View>

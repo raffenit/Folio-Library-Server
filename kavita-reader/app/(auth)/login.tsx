@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors, Typography, Spacing, Radius } from '../../constants/theme';
-import { Ionicons } from '@expo/vector-icons';;
+import { Ionicons } from '@expo/vector-icons';
+import { FolioLogo } from '../../components/FolioLogo';
 
 const proxyUrl =
   Platform.OS === 'web' && typeof window !== 'undefined'
@@ -55,10 +56,8 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoMark}>K</Text>
-          </View>
-          <Text style={styles.appName}>Kavita Reader</Text>
+          <FolioLogo size={64} accentColor={Colors.accent} showLabel />
+          <Text style={styles.appName}>Folio</Text>
           <Text style={styles.tagline}>Your library, everywhere.</Text>
         </View>
 
@@ -141,7 +140,7 @@ export default function LoginScreen() {
 
         {/* Footer */}
         <Text style={styles.footer}>
-          Kavita Reader connects directly to your self-hosted server.{'\n'}No data is stored externally.
+          Folio connects directly to your self-hosted server.{'\n'}No data is stored externally.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

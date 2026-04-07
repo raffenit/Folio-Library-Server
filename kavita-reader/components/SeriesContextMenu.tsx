@@ -18,7 +18,8 @@ import {
   Platform,
 } from 'react-native';
 import { kavitaAPI, SeriesMetadata, Genre, Tag, Collection } from '../services/kavitaAPI';
-import { Colors, Typography, Spacing, Radius } from '../constants/theme';
+import { Typography, Spacing, Radius } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export interface ContextMenuPosition {
@@ -36,13 +37,14 @@ interface Props {
 }
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
   return (
     <TouchableOpacity
-      style={[styles.chip, selected && styles.chipActive]}
+      style={{ backgroundColor: selected ? colors.accentSoft : colors.background, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderWidth: 1, borderColor: selected ? colors.accent : colors.border }}
       onPress={onPress}
       activeOpacity={0.75}
     >
-      <Text style={[styles.chipText, selected && styles.chipTextActive]}>{label}</Text>
+      <Text style={{ fontSize: 12, color: selected ? colors.accent : colors.textSecondary }}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -50,6 +52,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
 export default function SeriesContextMenu({
   visible, seriesId, seriesName, position, onClose, onOpenDetail,
 }: Props) {
+  const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -174,34 +177,34 @@ export default function SeriesContextMenu({
       onRequestClose={onClose}
     >
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop} />
+        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.45)' }} />
       </TouchableWithoutFeedback>
 
-      <View style={[styles.menu, { width: MENU_W, top, left }]}>
+      <View style={{ position: 'absolute', width: MENU_W, top, left, backgroundColor: colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 16 }}>
         {/* Header */}
-        <View style={styles.menuHeader}>
-          <Text style={styles.menuTitle} numberOfLines={1}>{seriesName}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Ionicons name="close" size={18} color={Colors.textMuted} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <Text style={{ flex: 1, fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textPrimary }} numberOfLines={1}>{seriesName}</Text>
+          <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
+            <Ionicons name="close" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
         {onOpenDetail && (
-          <TouchableOpacity style={styles.openDetailRow} onPress={onOpenDetail}>
-            <Ionicons name="book-outline" size={16} color={Colors.accent} />
-            <Text style={styles.openDetailText}>Open Detail</Text>
+          <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={onOpenDetail}>
+            <Ionicons name="book-outline" size={16} color={colors.accent} />
+            <Text style={{ fontSize: Typography.sm, color: colors.accent, fontWeight: Typography.medium }}>Open Detail</Text>
           </TouchableOpacity>
         )}
 
         {/* Tabs */}
-        <View style={styles.tabs}>
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border }}>
           {(['genres', 'tags', 'collections'] as const).map(t => (
             <TouchableOpacity
               key={t}
-              style={[styles.tab, tab === t && styles.tabActive]}
+              style={{ flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: tab === t ? colors.accent : 'transparent' }}
               onPress={() => { setTab(t); setSearch(''); }}
             >
-              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+              <Text style={{ fontSize: 12, color: tab === t ? colors.accent : colors.textSecondary, fontWeight: tab === t ? Typography.bold : Typography.medium }}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -209,164 +212,49 @@ export default function SeriesContextMenu({
         </View>
 
         {loading ? (
-          <View style={styles.loadingArea}>
-            <ActivityIndicator color={Colors.accent} />
+          <View style={{ height: 120, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator color={colors.accent} />
           </View>
         ) : (
           <>
             <TextInput
-              style={styles.searchInput}
+              style={{ margin: Spacing.sm, backgroundColor: colors.background, borderRadius: Radius.sm, borderWidth: 1, borderColor: colors.border, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs + 2, fontSize: Typography.sm, color: colors.textPrimary }}
               value={search}
               onChangeText={setSearch}
               placeholder={`Filter ${tab}…`}
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.textMuted}
             />
-            <ScrollView style={styles.chipScroll} contentContainerStyle={styles.chipContent}>
+            <ScrollView style={{ maxHeight: 180 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm }}>
               {filteredList.length === 0 && (
-                <Text style={styles.emptyText}>No {tab} found.</Text>
+                <Text style={{ fontSize: Typography.sm, color: colors.textMuted, fontStyle: 'italic', padding: Spacing.sm }}>No {tab} found.</Text>
               )}
               {filteredList.map(item => (
-                <Chip
-                  key={item.id}
-                  label={item.title}
-                  selected={isSelected(item)}
-                  onPress={() => handleToggle(item)}
-                />
+                <Chip key={item.id} label={item.title} selected={isSelected(item)} onPress={() => handleToggle(item)} />
               ))}
             </ScrollView>
           </>
         )}
 
-        {/* Save error */}
-        {saveError ? (
-          <Text style={styles.saveError}>{saveError}</Text>
-        ) : null}
+        {saveError ? <Text style={{ fontSize: 11, color: colors.error, paddingHorizontal: Spacing.md, paddingBottom: Spacing.xs, textAlign: 'center' }}>{saveError}</Text> : null}
 
-        {/* Save */}
         <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+          style={{ flexDirection: 'row', backgroundColor: colors.accent, margin: Spacing.sm, borderRadius: Radius.md, paddingVertical: Spacing.sm + 2, alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, opacity: saving ? 0.6 : 1 }}
           onPress={save}
           disabled={saving || loading}
           activeOpacity={0.85}
         >
           {saving ? (
-            <ActivityIndicator size="small" color={Colors.textOnAccent} />
+            <ActivityIndicator size="small" color={colors.textOnAccent} />
           ) : saved ? (
             <>
-              <Ionicons name="checkmark" size={16} color={Colors.textOnAccent} />
-              <Text style={styles.saveBtnText}>Saved!</Text>
+              <Ionicons name="checkmark" size={16} color={colors.textOnAccent} />
+              <Text style={{ fontSize: Typography.sm, fontWeight: Typography.bold, color: colors.textOnAccent }}>Saved!</Text>
             </>
           ) : (
-            <Text style={styles.saveBtnText}>Save Changes</Text>
+            <Text style={{ fontSize: Typography.sm, fontWeight: Typography.bold, color: colors.textOnAccent }}>Save Changes</Text>
           )}
         </TouchableOpacity>
       </View>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  backdrop: {
-    position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  menu: {
-    position: 'absolute',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 16,
-  },
-  menuHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  menuTitle: {
-    flex: 1, fontSize: Typography.sm,
-    fontWeight: Typography.semibold, color: Colors.textPrimary,
-  },
-  closeBtn: { padding: 4 },
-  openDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  openDetailText: {
-    fontSize: Typography.sm, color: Colors.accent, fontWeight: Typography.medium,
-  },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  tab: {
-    flex: 1, paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: { borderBottomColor: Colors.accent },
-  tabText: { fontSize: 12, color: Colors.textSecondary, fontWeight: Typography.medium },
-  tabTextActive: { color: Colors.accent, fontWeight: Typography.bold },
-  loadingArea: { height: 120, justifyContent: 'center', alignItems: 'center' },
-  searchInput: {
-    margin: Spacing.sm,
-    backgroundColor: Colors.background,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs + 2,
-    fontSize: Typography.sm,
-    color: Colors.textPrimary,
-  },
-  chipScroll: { maxHeight: 180 },
-  chipContent: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    gap: Spacing.xs, paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm,
-  },
-  chip: {
-    backgroundColor: Colors.background,
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  chipActive: { backgroundColor: Colors.accentSoft, borderColor: Colors.accent },
-  chipText: { fontSize: 12, color: Colors.textSecondary },
-  chipTextActive: { color: Colors.accent },
-  emptyText: { fontSize: Typography.sm, color: Colors.textMuted, fontStyle: 'italic', padding: Spacing.sm },
-  saveError: {
-    fontSize: 11, color: Colors.error,
-    paddingHorizontal: Spacing.md, paddingBottom: Spacing.xs,
-    textAlign: 'center',
-  },
-  saveBtn: {
-    flexDirection: 'row',
-    backgroundColor: Colors.accent,
-    margin: Spacing.sm,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.sm + 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: {
-    fontSize: Typography.sm, fontWeight: Typography.bold, color: Colors.textOnAccent,
-  },
-});

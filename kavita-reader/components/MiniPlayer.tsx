@@ -1,13 +1,11 @@
-import React, { useCallback } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, Image,
-  Platform,
-} from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAudioPlayer } from '../contexts/AudioPlayerContext'; 
+import { useAudioPlayer } from '../contexts/AudioPlayerContext';
 import { useRouter } from 'expo-router';
+import { useTheme } from '../contexts/ThemeContext';
 import { absAPI } from '../services/audiobookshelfAPI';
-import { Colors, Typography, Spacing, Radius } from '../constants/theme';
+import { Typography, Spacing, Radius } from '../constants/theme';
 
 function formatTime(seconds: number): string {
   const s = Math.floor(seconds);
@@ -18,19 +16,13 @@ function formatTime(seconds: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+const MINI_PLAYER_HEIGHT = 72;
+export const MINI_PLAYER_TOTAL_HEIGHT = MINI_PLAYER_HEIGHT + 3;
+
 export function MiniPlayer() {
   const router = useRouter();
-  
-  // 2. This will now have nowPlaying, sessionTime, etc.
-  const { 
-    nowPlaying, 
-    isPlaying, 
-    sessionTime, 
-    togglePlayPause, 
-    skipBack, 
-    skipForward, 
-    stop 
-  } = useAudioPlayer();
+  const { colors } = useTheme();
+  const { nowPlaying, isPlaying, sessionTime, togglePlayPause, skipBack, skipForward, stop } = useAudioPlayer();
 
   if (!nowPlaying) return null;
   const { item } = nowPlaying;
@@ -40,124 +32,48 @@ export function MiniPlayer() {
   const progress = duration > 0 ? Math.min(sessionTime / duration, 1) : 0;
   const coverUri = absAPI.getCoverUrl(item.id);
 
-  function openFullPlayer() {
-    router.push(`/audiobook/${item.id}`);
-  }
-
   return (
-    <View style={styles.wrapper}>
+    <View style={{
+      position: 'absolute', left: 0, right: 0,
+      bottom: Platform.OS === 'ios' ? 78 : 68,
+      backgroundColor: colors.surfaceElevated,
+      borderTopWidth: 1, borderTopColor: colors.border,
+      shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.3, shadowRadius: 8, elevation: 12,
+    }}>
       {/* Progress bar */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` as any }]} />
+      <View style={{ height: 3, backgroundColor: colors.progressTrack }}>
+        <View style={{ height: 3, width: `${progress * 100}%` as any, backgroundColor: colors.accent }} />
       </View>
 
-      <TouchableOpacity style={styles.container} onPress={openFullPlayer} activeOpacity={0.85}>
-        {/* Cover */}
-        <Image source={{ uri: coverUri }} style={styles.cover} />
+      <TouchableOpacity
+        style={{ height: MINI_PLAYER_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, gap: Spacing.md }}
+        onPress={() => router.push(`/audiobook/${item.id}`)}
+        activeOpacity={0.85}
+      >
+        <Image source={{ uri: coverUri }} style={{ width: 48, height: 48, borderRadius: Radius.sm, backgroundColor: colors.surface }} />
 
-        {/* Info */}
-        <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={1}>{title}</Text>
-          {author ? <Text style={styles.author} numberOfLines={1}>{author}</Text> : null}
-          <Text style={styles.time}>{formatTime(sessionTime)}</Text>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textPrimary }} numberOfLines={1}>{title}</Text>
+          {author ? <Text style={{ fontSize: Typography.xs, color: colors.textSecondary }} numberOfLines={1}>{author}</Text> : null}
+          <Text style={{ fontSize: Typography.xs, color: colors.textMuted }}>{formatTime(sessionTime)}</Text>
         </View>
 
-        {/* Controls */}
-        <View style={styles.controls}>
-          <TouchableOpacity onPress={() => skipBack(15)} hitSlop={8} style={styles.controlBtn}>
-            <Ionicons name="play-back" size={22} color={Colors.textPrimary} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <TouchableOpacity onPress={() => skipBack(15)} hitSlop={8} style={{ padding: 4 }}>
+            <Ionicons name="play-back" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={togglePlayPause} hitSlop={8} style={styles.playBtn}>
-            <Ionicons
-              name={isPlaying ? 'pause' : 'play'}
-              size={26}
-              color={Colors.textOnAccent}
-            />
+          <TouchableOpacity onPress={togglePlayPause} hitSlop={8} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accent, justifyContent: 'center', alignItems: 'center' }}>
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={26} color={colors.textOnAccent} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => skipForward(30)} hitSlop={8} style={styles.controlBtn}>
-            <Ionicons name="play-forward" size={22} color={Colors.textPrimary} />
+          <TouchableOpacity onPress={() => skipForward(30)} hitSlop={8} style={{ padding: 4 }}>
+            <Ionicons name="play-forward" size={22} color={colors.textPrimary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={stop} hitSlop={8} style={styles.controlBtn}>
-            <Ionicons name="close" size={20} color={Colors.textMuted} />
+          <TouchableOpacity onPress={stop} hitSlop={8} style={{ padding: 4 }}>
+            <Ionicons name="close" size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     </View>
   );
 }
-
-const MINI_PLAYER_HEIGHT = 72;
-export const MINI_PLAYER_TOTAL_HEIGHT = MINI_PLAYER_HEIGHT + 3; // 3px progress bar
-
-const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    // Sits just above the tab bar (58px) on tabs screens; on reader modals it shows at bottom
-    bottom: Platform.OS === 'ios' ? 78 : 68,
-    backgroundColor: Colors.surfaceElevated,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 12,
-  },
-  progressTrack: {
-    height: 3,
-    backgroundColor: Colors.progressTrack,
-  },
-  progressFill: {
-    height: 3,
-    backgroundColor: Colors.accent,
-  },
-  container: {
-    height: MINI_PLAYER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.md,
-  },
-  cover: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.surface,
-  },
-  info: {
-    flex: 1,
-    gap: 2,
-  },
-  title: {
-    fontSize: Typography.sm,
-    fontWeight: Typography.semibold,
-    color: Colors.textPrimary,
-  },
-  author: {
-    fontSize: Typography.xs,
-    color: Colors.textSecondary,
-  },
-  time: {
-    fontSize: Typography.xs,
-    color: Colors.textMuted,
-    fontVariant: ['tabular-nums'],
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  controlBtn: {
-    padding: 4,
-  },
-  playBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});

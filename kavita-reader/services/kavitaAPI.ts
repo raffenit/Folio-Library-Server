@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { Platform } from 'react-native';
 import { storage } from './storage';
 
@@ -203,23 +203,12 @@ class KavitaAPI {
 
   async initialize() {
     try {
-      // 1. Get credentials (prioritize .env for dev stability)
-      const envUrl = process.env.EXPO_PUBLIC_KAVITA_URL;
-      const envKey = process.env.EXPO_PUBLIC_KAVITA_API_KEY;
-      
       const storedUrl = await storage.getItem(STORAGE_KEYS.SERVER_URL);
       const storedKey = await storage.getItem(STORAGE_KEYS.API_KEY);
 
-      const finalUrl = envUrl || storedUrl;
-      const finalKey = envKey || storedKey;
-
-      if (finalUrl && finalKey) {
-        this.setServer(finalUrl, finalKey);
-        
-        // 2. Perform the actual authentication exchange
-        // This is what generates the JWT token and stops the 401s
+      if (storedUrl && storedKey) {
+        this.setServer(storedUrl, storedKey);
         const success = await this.login();
-        
         if (success) {
           console.log(`✅ Kavita Authenticated: ${this.serverUrl}`);
         } else {
@@ -283,7 +272,7 @@ class KavitaAPI {
       const response = await this.client.post('/api/Plugin/authenticate', null, {
         params: { 
           apiKey: this.apiKey, 
-          pluginName: 'KavitaReaderApp' 
+          pluginName: 'Folio'
         },
       });
 
@@ -499,11 +488,10 @@ async getBookToc(chapterId: number): Promise<BookTocEntry[]> {
   // ── Reader ──────────────────────────────────────────────────────────────────
 async getChapterInfo(chapterId: number): Promise<ChapterInfo> {
   const response = await this.client.get(`/api/Reader/chapter-info?chapterId=${chapterId}`);
-  
-  // Kavita sometimes nests this data or uses different field names (pages vs pageCount)
-  // Ensure we map it correctly to our interface
+  // Kavita's chapter-info response does not include the chapterId itself — inject it.
   return {
     ...response.data,
+    chapterId,
     pages: response.data.pages || response.data.pagesCount || 0,
     lastReadPage: response.data.lastReadPage ?? 0
   };
@@ -511,23 +499,30 @@ async getChapterInfo(chapterId: number): Promise<ChapterInfo> {
 
 // ── Reading progress ─────────────────────────────────────────────────────────
 
+  async getReadingProgress(chapterId: number): Promise<number> {
+    try {
+      const res = await this.client.get(`/api/Reader/get-progress?chapterId=${chapterId}`);
+      return res.data?.pageNum ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
   async saveReadingProgress(chapter: any, page: number) {
     if (!chapter?.chapterId) return;
-
-    const payload = {
-      // DO NOT wrap in progressDto yet—most Kavita versions want it flat 
-      // but they CRITICALY want numbers, not strings.
-      libraryId: parseInt(chapter.libraryId, 10),
-      seriesId: parseInt(chapter.seriesId, 10),
-      volumeId: parseInt(chapter.volumeId, 10),
-      chapterId: parseInt(chapter.chapterId, 10),
-      pageNum: parseInt(page.toString(), 10),
-      isRead: false
-    };
-
-    await this.client.post(`/api/Reader/progress?apiKey=${this.apiKey}`, payload);
-  } catch (err: any) {
-    console.error('Kavita Progress Sync Failed:', err.response?.data || err.message);
+    try {
+      const payload = {
+        libraryId: parseInt(chapter.libraryId, 10),
+        seriesId: parseInt(chapter.seriesId, 10),
+        volumeId: parseInt(chapter.volumeId, 10),
+        chapterId: parseInt(chapter.chapterId, 10),
+        pageNum: parseInt(page.toString(), 10),
+        isRead: false,
+      };
+      await this.client.post(`/api/Reader/progress?apiKey=${this.apiKey}`, payload);
+    } catch (err: any) {
+      console.error('Kavita Progress Sync Failed:', err.response?.status, err.response?.data || err.message);
+    }
   }
 
   // ── File health ──────────────────────────────────────────────────────────────

@@ -22,11 +22,24 @@ export default function PDFReaderScreen() {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
+  // Loading state definition
+  const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [error, setError] = useState('');
+
   useEffect(() => {
     (async () => {
-      const info = await kavitaAPI.getChapterInfo(chapterId);
-      setChapterInfo(info);
-      if (info?.lastReadPage) setCurrentPage(info.lastReadPage);
+      try {
+        const info = await kavitaAPI.getChapterInfo(chapterId);
+        setChapterInfo(info);
+        setTotalPages(info?.pages ?? 0);
+        const savedPage = await kavitaAPI.getReadingProgress(chapterId);
+        if (savedPage > 0) setCurrentPage(savedPage);
+      } catch (e) {
+        console.error('Failed to load chapter info', e);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [chapterId]);
 
@@ -36,29 +49,10 @@ export default function PDFReaderScreen() {
       kavitaAPI.saveReadingProgress(chapterInfo, page);
     }
   }
-  
+
   // pageUrl uses the /image endpoint we validated earlier
   const pageUrl = kavitaAPI.getPdfPageImageUrl(chapterId, currentPage);
   const router = useRouter();
-
-  // Loading state definition
-  const [loading, setLoading] = useState(true);
-  const [pageLoading, setPageLoading] = useState(true);
-  const [error, setError] = useState('');
-  
-
-  useEffect(() => {
-    (async () => {
-      try {
-        // 2. Fetch the full info once when the screen loads
-        const info = await kavitaAPI.getChapterInfo(chapterId);
-        setChapterInfo(info); 
-        setTotalPages(info?.pages ?? 0);
-      } catch (e) {
-        console.error('Failed to load chapter info', e);
-      }
-    })();
-  }, [chapterId]);
 
   const canPrev = currentPage > 0 && !pageLoading;
   const canNext = currentPage < totalPages - 1 && !pageLoading;

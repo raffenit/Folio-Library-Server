@@ -3,17 +3,19 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, StatusBar, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { kavitaAPI, BookTocEntry } from '../../services/kavitaAPI';
-import { Colors } from '../../constants/theme';
+import { kavitaAPI, BookTocEntry, ChapterInfo } from '../../services/kavitaAPI';
+import { useTheme } from '../../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 interface BuildOptions {
   serverUrl: string;
   chapterId: number;
   apiKey: string;
+  fontFamily?: string;
+  customFontFace?: string;
 }
 
-function buildPageHtml(rawHtml: string, { serverUrl, chapterId, apiKey }: BuildOptions): string {
+function buildPageHtml(rawHtml: string, { serverUrl, chapterId, apiKey, fontFamily = 'Georgia, "Times New Roman", serif', customFontFace = '' }: BuildOptions): string {
   // Kavita returns a full HTML document — extract just the body content
   const bodyMatch = rawHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   const rawContent = bodyMatch
@@ -24,21 +26,61 @@ function buildPageHtml(rawHtml: string, { serverUrl, chapterId, apiKey }: BuildO
         .replace(/<\/?(html|body)[^>]*>/gi, '')
         .trim();
 
-  // Rewrite relative resource URLs (src/href="book-resources?file=...") to
-  // absolute Kavita URLs. Without this the iframe resolves them against the
-  // dev-server origin and they time out, breaking layout measurement.
   const base = `${serverUrl}/api/Book/${chapterId}`;
-  const cleanContent = rawContent.replace(
-    /(src|href)="(book-resources\?[^"]*)"/gi,
-    (_m, attr, path) => `${attr}="${base}/${path}&apiKey=${apiKey}"`
-  );
+
+  // Rewrite resource URLs to absolute Kavita URLs with apiKey.
+  // Kavita emits two URL formats depending on version:
+  //   1. Relative:       src="book-resources?file=cover.jpeg"
+  //   2. Absolute-path:  src="/api/Book/184/book-resources?file=cover.jpeg"
+  // Both need the server host prepended and apiKey appended so the browser
+  // can authenticate the request.
+  const rewriteUrl = (path: string): string => {
+    let absolute: string;
+    if (path.startsWith('http')) {
+      // Already fully absolute — keep as-is
+      absolute = path;
+    } else if (path.startsWith('//')) {
+      // Protocol-relative (//host/path) — strip the embedded host and use
+      // our serverUrl so the correct port is included.
+      const afterSlashes = path.slice(2);
+      const slashIdx = afterSlashes.indexOf('/');
+      const pathname = slashIdx >= 0 ? afterSlashes.slice(slashIdx) : '';
+      absolute = `${serverUrl}${pathname}`;
+    } else if (path.startsWith('/')) {
+      // Absolute-path (/api/...) — prepend host only
+      absolute = `${serverUrl}${path}`;
+    } else {
+      // Relative (book-resources?... or ./book-resources?...) — prepend base
+      absolute = `${base}/${path.replace(/^\.\//, '')}`;
+    }
+    const sep = absolute.includes('?') ? '&' : '?';
+    return `${absolute}${sep}apiKey=${apiKey}`;
+  };
+
+  const cleanContent = rawContent
+    // Pass 1: relative/absolute-path src and href attributes
+    .replace(
+      /((?:src|href)\s*=\s*)(["'])([^"']*book-resources[^"']*)\2/gi,
+      (_m, attr, quote, path) => `${attr}${quote}${rewriteUrl(path)}${quote}`
+    )
+    // Pass 2: absolute-path /api/ URLs in src/href (catches other API assets)
+    .replace(
+      /((?:src|href)\s*=\s*)(["'])(\/api\/[^"']+)\2/gi,
+      (_m, attr, quote, path) => {
+        const absolute = `${serverUrl}${path}`;
+        const sep = absolute.includes('?') ? '&' : '?';
+        return `${attr}${quote}${absolute}${sep}apiKey=${apiKey}${quote}`;
+      }
+    );
 
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="${base}/">
 <style>
+  ${customFontFace}
   *, *::before, *::after { box-sizing: border-box; }
 
   html, body {
@@ -86,7 +128,7 @@ function buildPageHtml(rawHtml: string, { serverUrl, chapterId, apiKey }: BuildO
 
   #book-content {
     color: #e2e2e2;
-    font-family: Georgia, 'Times New Roman', serif;
+    font-family: ${fontFamily};
     font-size: 18px;
     line-height: 1.7;
     text-align: justify;
@@ -124,27 +166,32 @@ function buildPageHtml(rawHtml: string, { serverUrl, chapterId, apiKey }: BuildO
   };
 
   /*
-   * Poll with rAF until scrollWidth is stable for 3 consecutive frames,
-   * then fire callback(pageCount). Handles slow multicol reflow reliably
-   * without a fixed timeout.
+   * Wait for all resources (images etc.) to finish loading, then measure.
+   * Using the 'load' event is far more reliable than rAF polling:
+   *   - rAF is throttled to ≤1fps in unfocused/background iframes, so
+   *     a "120 frame cap" could mean 2 minutes, not 2 seconds.
+   *   - 'load' fires after every img/font/css settles (including errors),
+   *     so scrollWidth is stable and accurate when we read it.
+   * A 3s setTimeout acts as a safety net if 'load' somehow never fires.
    */
   window.__measurePages = function(callback) {
-    var last = -1;
-    var stable = 0;
-    var iters = 0;
-    function check() {
-      var count = window.__getPageCount();
-      iters++;
-      if (count === last) {
-        stable++;
-        if (stable >= 3 || iters >= 120) { callback(count); return; }
-      } else {
-        stable = 0;
-        last = count;
-      }
-      requestAnimationFrame(check);
+    var fired = false;
+    function doMeasure() {
+      if (fired) return;
+      fired = true;
+      // Two rAFs after load to let multicol reflow finish painting
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          callback(window.__getPageCount());
+        });
+      });
     }
-    requestAnimationFrame(check);
+    if (document.readyState === 'complete') {
+      doMeasure();
+    } else {
+      window.addEventListener('load', doMeasure, { once: true });
+      setTimeout(doMeasure, 3000);
+    }
   };
 </script>
 </head>
@@ -168,19 +215,41 @@ export default function EpubReaderScreen() {
   const [visualPage, setVisualPage] = useState(0);
   const [totalVisualPages, setTotalVisualPages] = useState(1);
   const measuringRef = useRef(false);
+  const measuringTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentPageRef = useRef(0);
+  const initialLoadRef = useRef(true);
   const [iframeFocused, setIframeFocused] = useState(false);
   const [toc, setToc] = useState<BookTocEntry[]>([]);
+  const chapterInfoRef = useRef<ChapterInfo | null>(null);
 
+  currentPageRef.current = currentPage;
+
+  const { fontFamily, activeCustomFontId, customFonts } = useTheme();
+  const activeCustomFont = activeCustomFontId
+    ? customFonts.find(f => f.id === activeCustomFontId)
+    : null;
   const pageHtml = rawHtml ? buildPageHtml(rawHtml, {
     serverUrl: kavitaAPI.getServerUrl(),
     chapterId,
     apiKey: kavitaAPI.getApiKey(),
+    fontFamily,
+    customFontFace: activeCustomFont
+      ? `@font-face { font-family: '${activeCustomFont.name}'; src: url('${activeCustomFont.dataUrl}'); }`
+      : undefined,
   }) : '';
 
   const loadPage = useCallback(async (page: number) => {
     if (page < 0 || (totalPages > 0 && page >= totalPages)) return;
+    // Save progress for the page we're leaving — skip the very first load
+    // so we don't overwrite Kavita's stored position with page 0.
+    if (chapterInfoRef.current && !initialLoadRef.current) {
+      kavitaAPI.saveReadingProgress(chapterInfoRef.current, currentPageRef.current);
+    }
+    initialLoadRef.current = false;
     setLoading(true);
     measuringRef.current = true;
+    if (measuringTimerRef.current) clearTimeout(measuringTimerRef.current);
+    measuringTimerRef.current = setTimeout(() => { measuringRef.current = false; }, 5000);
     setVisualPage(0);
     setTotalVisualPages(1);
     try {
@@ -197,13 +266,15 @@ export default function EpubReaderScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const [info, tocData] = await Promise.all([
+        const [info, tocData, lastPage] = await Promise.all([
           kavitaAPI.getChapterInfo(chapterId),
           kavitaAPI.getBookToc(chapterId),
+          kavitaAPI.getReadingProgress(chapterId),
         ]);
+        chapterInfoRef.current = info;
         setTotalPages(info.pages || 0);
         setToc(tocData);
-        await loadPage(info.lastReadPage ?? 0);
+        await loadPage(lastPage);
       } catch (e) { console.error(e); }
     })();
   }, [chapterId]);
@@ -290,7 +361,12 @@ export default function EpubReaderScreen() {
     <View style={styles.container}>
       <StatusBar hidden />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => {
+          if (chapterInfoRef.current) {
+            kavitaAPI.saveReadingProgress(chapterInfoRef.current, currentPage);
+          }
+          router.back();
+        }}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center' }}>
@@ -322,6 +398,10 @@ export default function EpubReaderScreen() {
               win.__measurePages?.((count: number) => {
                 setTotalVisualPages(count);
                 measuringRef.current = false;
+                if (measuringTimerRef.current) {
+                  clearTimeout(measuringTimerRef.current);
+                  measuringTimerRef.current = null;
+                }
                 win.focus();
                 setIframeFocused(true);
               });
