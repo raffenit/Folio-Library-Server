@@ -85,7 +85,6 @@ function SettingRow({ icon, label, value, onPress, destructive, loading, statusT
 
 function KavitaConfigModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { colors } = useTheme();
-  const { login, logout, serverUrl } = useAuth();
   const [url, setUrl] = useState('');
   const [key, setKey] = useState('');
   const [testing, setTesting] = useState(false);
@@ -94,11 +93,11 @@ function KavitaConfigModal({ visible, onClose }: { visible: boolean; onClose: ()
 
   useEffect(() => {
     if (visible) {
-      setUrl(serverUrl);
-      setKey('');
+      setUrl(kavitaAPI.getServerUrl());
+      setKey(kavitaAPI.getApiKey() || '');
       setStatus('');
     }
-  }, [visible, serverUrl]);
+  }, [visible]);
 
   async function handleSave() {
     if (!url.trim() || !key.trim()) {
@@ -108,25 +107,33 @@ function KavitaConfigModal({ visible, onClose }: { visible: boolean; onClose: ()
     }
     setTesting(true);
     setStatus('');
-    const result = await login(url.trim(), key.trim());
-    setTesting(false);
-    if (result.success) {
-      setStatusOk(true);
-      setStatus('Connected successfully!');
-      setTimeout(onClose, 800);
-    } else {
+    try {
+      await kavitaAPI.saveCredentials(url.trim(), key.trim());
+      // Test the connection by attempting login
+      const success = await kavitaAPI.login();
+      if (success) {
+        setStatusOk(true);
+        setStatus('Connected successfully!');
+        setTimeout(onClose, 800);
+      } else {
+        setStatusOk(false);
+        setStatus('Connection failed - check URL and API key.');
+      }
+    } catch (e: any) {
       setStatusOk(false);
-      setStatus(result.error ?? 'Connection failed.');
+      setStatus(`Could not reach server — check URL and API key.`);
+    } finally {
+      setTesting(false);
     }
   }
 
-  function handleDisconnect() {
+  async function handleDisconnect() {
     Alert.alert(
       'Disconnect',
       'This will remove your server connection. You can reconnect at any time.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Disconnect', style: 'destructive', onPress: () => { logout(); onClose(); } },
+        { text: 'Disconnect', style: 'destructive', onPress: async () => { await kavitaAPI.logout(); onClose(); } },
       ]
     );
   }
