@@ -1,0 +1,4 @@
+# Project Rules & Model Instructions
+
+- **Builds & Updates**: Every time you make code updates, you MUST trigger a clean build (`rm -rf dist .expo && npm run build:pwa`). NEVER wait for this command to finish during a tool call. Set `WaitMsBeforeAsync` to the minimum (e.g., 500) and move on immediately, as these builds do not return meaningful output until they are fully complete, which takes too long.
+- **Server Support**: The app must support both Kavita and Audiobookshelf (ABS) backends seamlessly.

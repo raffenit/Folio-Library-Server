@@ -1,0 +1,67 @@
+# Caddyfile for Folio + Kavita + ABS
+# Place this in the same directory as your docker-compose.yml
+
+# Folio - Your PWA reader
+folio.yourdomain.com {
+    reverse_proxy folio:80
+
+    # Enable compression
+    encode gzip
+
+    # Cache static assets
+    @static {
+        path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf
+    }
+    header @static Cache-Control "public, max-age=31536000, immutable"
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+    }
+}
+
+# Kavita - Manga/Comics/EBooks server
+kavita.yourdomain.com {
+    reverse_proxy kavita:5000
+
+    encode gzip
+
+    # WebSocket support for Kavita
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websockets kavita:5000
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+    }
+}
+
+# Audiobookshelf - Audiobooks/Podcasts server
+abs.yourdomain.com {
+    reverse_proxy audiobookshelf:80
+
+    encode gzip
+
+    # WebSocket support for real-time updates
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websockets audiobookshelf:80
+
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+    }
+}
+
+# Optional: Local domain for development (no HTTPS)
+# folio.local {
+#     reverse_proxy folio:80
+#     tls internal  # Use internal self-signed cert
+# }

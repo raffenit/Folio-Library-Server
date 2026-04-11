@@ -1,0 +1,85 @@
+version: '3.8'
+
+# This is an example docker-compose for use WITH Caddy as reverse proxy
+# Copy the folio service into your existing docker-compose that has Caddy
+
+services:
+  # Add Folio - no ports needed, Caddy will proxy to it
+  folio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: folio
+    restart: unless-stopped
+    networks:
+      - media-network
+    # Optional: Add labels for Caddy dynamic config (if using caddy-docker-proxy)
+    labels:
+      caddy: folio.yourdomain.com  # Change to your domain/subdomain
+      caddy.reverse_proxy: "{{upstreams 80}}"
+      # Or use local network hostname:
+      # caddy.reverse_proxy: "folio:80"
+
+  # Example with Caddy using static Caddyfile (volume mount)
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    networks:
+      - media-network
+
+  # Your existing Kavita - remove ports if using Caddy proxy
+  kavita:
+    image: jvmilazz0/kavita:latest
+    container_name: kavita
+    volumes:
+      - /path/to/manga:/manga
+      - /path/to/comics:/comics
+      - /path/to/books:/books
+      - kavita-config:/kavita/config
+    # Remove ports if Caddy proxies to it internally
+    # ports:
+    #   - "8050:5000"
+    restart: unless-stopped
+    networks:
+      - media-network
+    labels:
+      caddy: kavita.yourdomain.com
+      caddy.reverse_proxy: "{{upstreams 5000}}"
+
+  # Your existing ABS - remove ports if using Caddy proxy
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    volumes:
+      - /path/to/audiobooks:/audiobooks
+      - /path/to/podcasts:/podcasts
+      - audiobookshelf-config:/config
+      - audiobookshelf-metadata:/metadata
+    # Remove ports if Caddy proxies to it internally
+    # ports:
+    #   - "81:80"
+    restart: unless-stopped
+    networks:
+      - media-network
+    labels:
+      caddy: abs.yourdomain.com
+      caddy.reverse_proxy: "{{upstreams 80}}"
+
+networks:
+  media-network:
+    driver: bridge
+
+volumes:
+  kavita-config:
+  audiobookshelf-config:
+  audiobookshelf-metadata:
+  caddy-data:
+  caddy-config:

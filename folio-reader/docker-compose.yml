@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  folio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: folio
+    ports:
+      - "3000:80"  # Folio will be available on port 3000
+    restart: unless-stopped
+    networks:
+      - media-network
+
+  # Uncomment or copy these into your existing docker-compose if not already present:
+  
+  # kavita:
+  #   image: jvmilazz0/kavita:latest
+  #   container_name: kavita
+  #   volumes:
+  #     - /path/to/manga:/manga
+  #     - /path/to/comics:/comics
+  #     - /path/to/books:/books
+  #     - kavita-config:/kavita/config
+  #   ports:
+  #     - "8050:5000"
+  #   restart: unless-stopped
+  #   networks:
+  #     - media-network
+  
+  # audiobookshelf:
+  #   image: ghcr.io/advplyr/audiobookshelf:latest
+  #   container_name: audiobookshelf
+  #   volumes:
+  #     - /path/to/audiobooks:/audiobooks
+  #     - /path/to/podcasts:/podcasts
+  #     - audiobookshelf-config:/config
+  #     - audiobookshelf-metadata:/metadata
+  #   ports:
+  #     - "81:80"
+  #   restart: unless-stopped
+  #   networks:
+  #     - media-network
+
+networks:
+  media-network:
+    driver: bridge
+
+# volumes:
+#   kavita-config:
+#   audiobookshelf-config:
+#   audiobookshelf-metadata:

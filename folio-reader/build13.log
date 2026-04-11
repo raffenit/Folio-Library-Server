@@ -1,0 +1,74 @@
+
+> kavita-reader@1.0.0 build:pwa
+> expo export --platform web && node scripts/pwa-post-build.js
+
+Starting Metro Bundler
+
+Web node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 680ms node_modules/expo-router/entry.js (1387 modules)
+
+› Assets (38):
+assets/login-logo.f6bd8ab31e86bf8085baff3da0ba47f9.png (216KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.3f78af31cca60105799838a1a7a59fbd.ttf (130KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.31b5ffea3daddc69dd01a1f3d6cf63c5.ttf (66KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/EvilIcons.140c53a7643ea949007aa9a282153849.ttf (13KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ca4b48e04dc1ce10bfbddb262c8b835f.ttf (56KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.b06871f281fee6b241d60582ae9369b9.ttf (166KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Brands.3b89dd103490708d19a95adcae52210e.ttf (134KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.1f77739ca9ff2188b539c36f30ffa2be.ttf (34KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.605ed7926cf39a2ad5ec2d1f9d391d3d.ttf (203KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Brands.56c8d80832e37783f12c05db7c8849e2.ttf (209KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.370dd5af19f8364907b6e2c41f45dbbf.ttf (68KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.adec7d6f310bc577f05e8fe06a5daccf.ttf (424KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Fontisto.b49ae8ab2dbccb02c4d11caaacf09eab.ttf (314KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Foundation.e20945d7c929279ef7a6f1db184a4470.ttf (57KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf (390KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.6e435534bd35da5fef04168860a9b8fa.ttf (1.3MB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.4e85bc9ebe07e0340c9c4fc2f6c38908.ttf (357KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Octicons.871378c6eab492a3e689a9385dc45a12.ttf (69KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/SimpleLineIcons.d2285965fe34b05465047401b8595dd0.ttf (54KB)
+node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Zocial.1681f34aaca71b8dfb70756bca331eb2.ttf (26KB)
+node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.0a328cd9c1afd0afe8e3b1ec5165b1b4.png (653B)
+node_modules/@react-navigation/elements/lib/module/assets/back-icon.35ba0eaec5a4f5ed12ca16fabeae451d.png (207B)
+node_modules/@react-navigation/elements/lib/module/assets/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55.png (4 variations | 425B)
+node_modules/@react-navigation/elements/lib/module/assets/close-icon.808e1b1b9b53114ec2838071a7e6daa7.png (4 variations | 235B)
+node_modules/@react-navigation/elements/lib/module/assets/search-icon.286d67d3f74808a60a78d3ebf1a5fb57.png (928B)
+node_modules/expo-router/assets/arrow_down.017bc6ba3fc25503e5eb5e53826d48a8.png (9.5KB)
+node_modules/expo-router/assets/error.d1ea1496f9057eb392d5bbf3732a61b7.png (469B)
+node_modules/expo-router/assets/file.19eeb73b9593a38f8e9f418337fc7d10.png (138B)
+node_modules/expo-router/assets/forward.d8b800c443b8972542883e0b9de2bdc6.png (188B)
+node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png (364B)
+node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png (465B)
+node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png (4.8KB)
+
+› web bundles (1):
+_expo/static/js/web/entry-34a83375648d0c6d53c1496ecfc9999f.js (2.8MB)
+
+› Files (3):
+favicon.ico (15KB)
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist
+Copied public/assets/icon.png → dist/assets/icon.png
+Copied public/fonts/.gitkeep → dist/fonts/.gitkeep
+Copied public/fonts/Bookerly Bold Italic.ttf → dist/fonts/Bookerly Bold Italic.ttf
+Copied public/fonts/Bookerly Bold.ttf → dist/fonts/Bookerly Bold.ttf
+Copied public/fonts/Bookerly Display Bold Italic.ttf → dist/fonts/Bookerly Display Bold Italic.ttf
+Copied public/fonts/Bookerly Display Bold.ttf → dist/fonts/Bookerly Display Bold.ttf
+Copied public/fonts/Bookerly Display Italic.ttf → dist/fonts/Bookerly Display Italic.ttf
+Copied public/fonts/Bookerly Display.ttf → dist/fonts/Bookerly Display.ttf
+Copied public/fonts/Bookerly Italic.ttf → dist/fonts/Bookerly Italic.ttf
+Copied public/fonts/Bookerly LCD Italic.ttf → dist/fonts/Bookerly LCD Italic.ttf
+Copied public/fonts/Bookerly LCD Light Italic.ttf → dist/fonts/Bookerly LCD Light Italic.ttf
+Copied public/fonts/Bookerly Light Italic.ttf → dist/fonts/Bookerly Light Italic.ttf
+Copied public/fonts/Bookerly Light.ttf → dist/fonts/Bookerly Light.ttf
+Copied public/fonts/Bookerly.ttf → dist/fonts/Bookerly.ttf
+Copied public/fonts/Caroni-Regular.otf → dist/fonts/Caroni-Regular.otf
+Copied public/fonts/OpenDyslexic-Bold.otf → dist/fonts/OpenDyslexic-Bold.otf
+Copied public/fonts/OpenDyslexic-BoldItalic.otf → dist/fonts/OpenDyslexic-BoldItalic.otf
+Copied public/fonts/OpenDyslexic-Italic.otf → dist/fonts/OpenDyslexic-Italic.otf
+Copied public/fonts/OpenDyslexic-Regular.otf → dist/fonts/OpenDyslexic-Regular.otf
+Copied public/manifest.json → dist/manifest.json
+Copied public/sw.js → dist/sw.js
+Patched dist/index.html with PWA meta tags and SW registration
