@@ -61,12 +61,17 @@ function serveStaticFile(res, filePath) {
 
 function handleProxy(req, res) {
   const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
-  const targetUrl = parsedUrl.searchParams.get('url');
+  let targetUrl = parsedUrl.searchParams.get('url');
 
   if (!targetUrl) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Missing url parameter' }));
     return;
+  }
+
+  // Double-decode in case URL got double-encoded
+  if (targetUrl.includes('%3A') || targetUrl.includes('%2F')) {
+    targetUrl = decodeURIComponent(targetUrl);
   }
 
   console.log(`[Proxy] ${req.method} ${targetUrl}`);
@@ -101,8 +106,20 @@ function handleProxy(req, res) {
       'Access-Control-Allow-Headers': '*',
     };
 
-    res.writeHead(proxyRes.statusCode, headers);
-    proxyRes.pipe(res);
+    // Log non-200 responses for debugging
+    if (proxyRes.statusCode >= 400) {
+      let body = '';
+      proxyRes.on('data', chunk => body += chunk);
+      proxyRes.on('end', () => {
+        console.error(`[Proxy Error] ${proxyRes.statusCode} from ${targetUrl}`);
+        console.error(`[Proxy Error] Response: ${body.substring(0, 500)}`);
+        res.writeHead(proxyRes.statusCode, headers);
+        res.end(body);
+      });
+    } else {
+      res.writeHead(proxyRes.statusCode, headers);
+      proxyRes.pipe(res);
+    }
   });
 
   proxyReq.on('error', (err) => {

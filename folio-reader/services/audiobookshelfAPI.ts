@@ -265,8 +265,10 @@ class AudiobookshelfAPI {
 
   /** Ping the server — returns true if reachable with the given key */
   async ping(): Promise<boolean> {
+    // Use /api/libraries instead of /ping because /api/ paths go through the proxy
+    // /ping doesn't contain /api/ so it bypasses proxy and causes CORS issues on web
     try {
-      await this.client.get('/ping');
+      await this.client.get('/api/libraries');
       return true;
     } catch {
       return false;

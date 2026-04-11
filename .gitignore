@@ -14,6 +14,11 @@ node_modules/
 # Documentation (AI-generated)
 DOCS.md
 
+# Deployment infrastructure
+deploy-webhook.js
+Dockerfile.deploy
+docker-compose.deploy.yml
+
 # Build outputs
 dist/
 build/

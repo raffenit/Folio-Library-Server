@@ -109,16 +109,11 @@ function KavitaConfigModal({ visible, onClose }: { visible: boolean; onClose: ()
     setStatus('');
     try {
       await kavitaAPI.saveCredentials(url.trim(), key.trim());
-      // Test the connection by attempting login
-      const success = await kavitaAPI.login();
-      if (success) {
-        setStatusOk(true);
-        setStatus('Connected successfully!');
-        setTimeout(onClose, 800);
-      } else {
-        setStatusOk(false);
-        setStatus('Connection failed - check URL and API key.');
-      }
+      // Test the connection by fetching libraries (like ABS does)
+      const libraries = await kavitaAPI.getLibraries();
+      setStatusOk(true);
+      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}.`);
+      setTimeout(onClose, 800);
     } catch (e: any) {
       setStatusOk(false);
       setStatus(`Could not reach server — check URL and API key.`);
@@ -491,6 +486,7 @@ export default function SettingsScreen() {
   const [customAccentFocused, setCustomAccentFocused] = useState(false);
   const styles = makeStyles(colors);
   const [kavitaModalVisible, setKavitaModalVisible] = useState(false);
+  const [kavitaUrl, setKavitaUrl] = useState(kavitaAPI.getServerUrl());
   const [scanLoading, setScanLoading] = useState(false);
   const [scanStatus, setScanStatus] = useState('');
   const [scanOk, setScanOk] = useState(false);
@@ -576,9 +572,9 @@ export default function SettingsScreen() {
           <ServerCard
             name="Kavita"
             icon="book"
-            url={displayUrl}
+            url={kavitaUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}
             isActive={serverType === 'kavita'}
-            isConnected={!!serverUrl}
+            isConnected={kavitaAPI.hasCredentials()}
             onEdit={() => setKavitaModalVisible(true)}
             onSync={serverType === 'kavita' ? handleScanAll : undefined}
             onDisconnect={logout}
@@ -996,7 +992,10 @@ export default function SettingsScreen() {
 
       <KavitaConfigModal
         visible={kavitaModalVisible}
-        onClose={() => setKavitaModalVisible(false)}
+        onClose={() => {
+          setKavitaModalVisible(false);
+          setKavitaUrl(kavitaAPI.getServerUrl());
+        }}
       />
 
       <ABSConfigModal
