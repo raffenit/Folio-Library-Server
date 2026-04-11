@@ -348,6 +348,7 @@ function CloudSyncSection() {
   const [serverUrl, setServerUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const styles = makeStyles(colors);
 
   const isConfigured = !!syncServerUrl && !!syncApiKey;
 
