@@ -1,2 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment
 .env
-node_modules
+.env.local
+.env.*.local
+
+# IDE and AI dev notes
+.claude/
+.vscode/
+.expo/
+
+# Documentation (AI-generated)
+DOCS.md
+
+# Build outputs
+dist/
+build/
+web-build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db

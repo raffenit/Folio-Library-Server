@@ -13,16 +13,18 @@ COPY . .
 # Build the PWA
 RUN npm run build:pwa
 
-# Production stage - nginx
-FROM nginx:alpine
+# Production stage - Node.js with proxy
+FROM node:20-alpine
 
 # Copy built files from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy Node.js server
+COPY server.js /app/server.js
+
+WORKDIR /app
 
 # Expose port
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]
