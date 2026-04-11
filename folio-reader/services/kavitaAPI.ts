@@ -372,8 +372,17 @@ class KavitaAPI {
       console.log('[KavitaAPI] No token in response:', response.data);
       return false;
     } catch (error: any) {
-      console.error('[KavitaAPI] Login error:', error?.response?.status, error?.response?.data || error?.message);
-      // We re-throw so AuthContext can catch and handle appropriately
+      const status = error?.response?.status;
+      console.error('[KavitaAPI] Login error:', status, error?.response?.data || error?.message);
+      
+      // 404 means this Kavita version doesn't have the Plugin API
+      // Return false so we can fall back to apiKey query param auth
+      if (status === 404) {
+        console.log('[KavitaAPI] Plugin API not available (404), falling back to apiKey auth');
+        return false;
+      }
+      
+      // Re-throw other errors (500, network issues, etc.)
       throw error;
     }
   }
@@ -571,9 +580,16 @@ async getBookPage(chapterId: number, page: number): Promise<string> {
 }
 
 async getBookToc(chapterId: number): Promise<BookTocEntry[]> {
-  const response = await this.client.get(`/api/Book/${chapterId}/chapters`);
-  return Array.isArray(response.data) ? response.data : [];
-}
+    try {
+      const response = await this.client.get(`/api/Book/${chapterId}/chapters`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error: any) {
+      // Some Kavita versions return 500 on this endpoint
+      // Return empty TOC so the reader can still load
+      console.warn(`[KavitaAPI] Failed to get TOC for chapter ${chapterId}:`, error?.response?.status);
+      return [];
+    }
+  }
 
   // ── Reader ──────────────────────────────────────────────────────────────────
 async getChapterInfo(chapterId: number): Promise<ChapterInfo> {
