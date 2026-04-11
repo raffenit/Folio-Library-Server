@@ -116,22 +116,51 @@ The proxy:
 - Handles authentication token injection
 - Runs on port 3000 alongside the main app
 
-### Auto-Deploy Webhook (Optional)
+### Auto-Deploy Webhook + Cloud Sync (Optional)
 
-For automatic deployment on git push, start the deploy webhook:
+The deploy webhook server (`docker-compose.deploy.yml`) provides two features:
+
+1. **Auto-Deploy** — Automatically redeploy the app when you push to GitHub
+2. **Cloud Sync** — Sync profiles across all your devices (web, mobile, tablet)
+
+#### Setup
 
 ```bash
-# Set a secret for webhook security
+# Create data directory for profile storage
+mkdir -p /home/jewelshadow/Documents/Projects/Folio/data
+
+# Set a secret for security (used for both deploy and sync)
 export DEPLOY_SECRET="your-secret-here"
 
-# Start the webhook receiver
+# Start the webhook + sync server
 docker-compose -f docker-compose.deploy.yml up -d --build
 ```
 
-Then add a GitHub webhook:
+#### Feature 1: Auto-Deploy Webhook
+
+Add a GitHub webhook to enable auto-deployment:
 - **URL**: `http://YOUR_SERVER_IP:9000/deploy`
 - **Secret**: Same as `DEPLOY_SECRET`
 - **Events**: Push to main branch
+
+#### Feature 2: Profile Cloud Sync
+
+Sync profiles (and their settings) across all devices:
+
+1. Go to **Settings → Cloud Sync** in the app
+2. Enter your server URL: `http://YOUR_SERVER_IP:9000`
+3. Enter your API key (same as `DEPLOY_SECRET`)
+4. Tap Save
+
+**How it works:**
+- Each device gets a unique ID automatically
+- Profiles auto-upload when you make changes (create, edit, select)
+- Profiles auto-download on app startup
+- Last sync time shown in Settings
+- Manual "Sync Now" button available
+
+**Offline Support:**
+The app functions fully when the sync server is unreachable. Changes are stored locally and will sync automatically when connection is restored. The app never blocks on sync operations — everything happens in the background.
 
 ### Kavita API
 

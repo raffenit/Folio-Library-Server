@@ -145,6 +145,7 @@ export default function AudiobookPlayerScreen() {
   const duration = isCurrentItem ? nowPlaying!.session.duration : (item?.totalDuration ?? 0);
   const displayTime = sessionTime;
 
+  // Load item on initial mount only - don't auto-reload when nowPlaying changes
   useEffect(() => {
     setTitleOverride(null);
     setAuthorOverride(null);
@@ -154,7 +155,8 @@ export default function AudiobookPlayerScreen() {
     } else {
       loadItem();
     }
-  }, [id, isCurrentItem]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // Only re-run when id changes, not when isCurrentItem changes
 
   // Search Kavita for a matching ebook series once the title is known
   useEffect(() => {

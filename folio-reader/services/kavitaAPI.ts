@@ -698,16 +698,27 @@ async getChapterInfo(chapterId: number): Promise<ChapterInfo> {
   // ── Reader URLs ──────────────────────────────────────────────────────────────
 
   getPdfReaderUrl(chapterId: number): string {
-    return `${this.serverUrl}/api/Reader/pdf?chapterId=${chapterId}&apiKey=${this.apiKey}`;
+    const targetUrl = `${this.serverUrl}/api/Reader/pdf?chapterId=${chapterId}&apiKey=${this.apiKey}`;
+    if (this.proxyOrigin) {
+      return `${this.proxyOrigin}${encodeURIComponent(targetUrl)}`;
+    }
+    return targetUrl;
   }
 
   getEpubReaderUrl(chapterId: number): string {
-    return `${this.serverUrl}/api/Reader/epub?chapterId=${chapterId}&apiKey=${this.apiKey}`;
+    const targetUrl = `${this.serverUrl}/api/Reader/epub?chapterId=${chapterId}&apiKey=${this.apiKey}`;
+    if (this.proxyOrigin) {
+      return `${this.proxyOrigin}${encodeURIComponent(targetUrl)}`;
+    }
+    return targetUrl;
   }
 
   getPdfPageImageUrl(chapterId: number, page: number): string {
-    // Use the /image endpoint we discovered earlier
-    return `${this.serverUrl}/api/Reader/image?bookId=${chapterId}&pageNum=${page}&apiKey=${this.apiKey}`;
+    const targetUrl = `${this.serverUrl}/api/Reader/image?bookId=${chapterId}&pageNum=${page}&apiKey=${this.apiKey}`;
+    if (this.proxyOrigin) {
+      return `${this.proxyOrigin}${encodeURIComponent(targetUrl)}`;
+    }
+    return targetUrl;
   }
 
   // ── Bookmarks ────────────────────────────────────────────────────────────────

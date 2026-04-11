@@ -16,6 +16,7 @@
   "dependencies": {
     "@expo/config-plugins": "~55.0.5",
     "@expo/vector-icons": "^15.1.1",
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/slider": "5.1.2",
     "@shopify/flash-list": "^2.0.2",
     "axios": "^1.7.2",

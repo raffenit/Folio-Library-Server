@@ -21,6 +21,7 @@ export function useLibraryItem(id: string | number, type: 'kavita' | 'abs') {
     try {
       setLoading(true);
       setError(null);
+      setData(null); // Clear previous data to prevent showing old book
       const currentProvider = LibraryFactory.getProvider(type);
       setProvider(currentProvider);
       

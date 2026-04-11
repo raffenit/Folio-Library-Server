@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Hooks & Services
 import { useLibraryItem } from '@/hooks/useLibraryItem';
-import { pickBestFile } from '@/services/kavitaAPI';
+import { kavitaAPI, pickBestFile, BookTocEntry } from '@/services/kavitaAPI';
 import { LibraryVolume, LibraryChapter } from '@/services/LibraryProvider';
 import { useAudioPlayer } from '@/contexts/AudioPlayerContext';
 import { absAPI, ABSLibraryItem } from '@/services/audiobookshelfAPI';
@@ -102,9 +102,38 @@ export default function SeriesDetailScreen() {
   const [coverKey, setCoverKey] = useState(0);
   const [matchingAudiobook, setMatchingAudiobook] = useState<ABSLibraryItem | null>(null);
   const [searchingAudiobook, setSearchingAudiobook] = useState(false);
+  const [tocEntries, setTocEntries] = useState<BookTocEntry[] | null>(null);
+  const [tocLoading, setTocLoading] = useState(false);
   const { play } = useAudioPlayer();
 
   const chapters = useMemo(() => (detail?.volumes ? flatChapters(detail.volumes) : []), [detail]);
+
+  // For single-chapter EPUBs, fetch TOC to show actual chapters
+  // PDFs have actual page counts (100+), EPUBs typically have 0-1 pages per chapter
+  useEffect(() => {
+    if (type !== 'kavita' || chapters.length !== 1) {
+      setTocEntries(null);
+      return;
+    }
+    
+    const chapter = chapters[0]?.chapter;
+    const chapterId = chapter?.id;
+    // Only fetch TOC for EPUB-style books (low page count)
+    // PDFs have many pages and don't need TOC fetching
+    if (!chapterId || tocLoading || (chapter?.pages || 0) > 10) return;
+    
+    setTocLoading(true);
+    kavitaAPI.getBookToc(Number(chapterId))
+      .then(toc => {
+        if (toc && toc.length > 0) {
+          setTocEntries(toc);
+        } else {
+          setTocEntries(null);
+        }
+      })
+      .catch(() => setTocEntries(null))
+      .finally(() => setTocLoading(false));
+  }, [chapters, type]);
   const resume = useMemo(() => (detail?.volumes ? pickResumeChapter(detail.volumes) : null), [detail]);
 
   const overallProgress = useMemo(() => {
@@ -307,7 +336,44 @@ export default function SeriesDetailScreen() {
         {/* Chapters Section */}
         <View style={styles.chaptersSection}>
           <Text style={styles.chaptersHeader}>Chapters</Text>
-          {chapters.length === 0 ? (
+          {tocLoading ? (
+            <ActivityIndicator color={colors.accent} />
+          ) : tocEntries && tocEntries.length > 0 ? (
+            // Show TOC entries for single-chapter EPUBs
+            tocEntries.map((entry, index) => (
+              <TouchableOpacity
+                key={`toc-${index}`}
+                style={styles.chapterRow}
+                onPress={() => {
+                  // Open reader at specific TOC page
+                  if (chapters.length === 1) {
+                    const { chapter, volume } = chapters[0];
+                    router.push({
+                      pathname: '/reader/epub',
+                      params: {
+                        chapterId: chapter.id,
+                        volumeId: volume.id,
+                        seriesId: id,
+                        title: displayName,
+                        page: entry.page,
+                      }
+                    });
+                  }
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={styles.chapterLeft}>
+                  <Text style={styles.chapterNum}>{entry.title}</Text>
+                  <View style={styles.chapterMeta}>
+                    <Text style={styles.chapterPages}>Page {entry.page}</Text>
+                  </View>
+                </View>
+                <View style={styles.chapterRight}>
+                  <Ionicons name="play-circle-outline" size={20} color={colors.textMuted} />
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : chapters.length === 0 ? (
             <Text style={styles.noChapters}>No chapters found.</Text>
           ) : (
             chapters.map(({ chapter, volume }) => {

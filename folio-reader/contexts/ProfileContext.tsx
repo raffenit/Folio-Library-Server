@@ -1,9 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { storage } from '../services/storage';
 import { autoBackup } from '../services/backup';
+import { Platform } from 'react-native';
 
 const PROFILES_KEY = 'folio_profiles_v1';
 const ACTIVE_PROFILE_KEY = 'folio_active_profile_id';
+const DEVICE_ID_KEY = 'folio_device_id';
+const SYNC_SERVER_URL_KEY = 'folio_sync_server_url';
+const SYNC_API_KEY_KEY = 'folio_sync_api_key';
+
+// Generate or load device ID
+async function getOrCreateDeviceId(): Promise<string> {
+  let deviceId = await storage.getItem(DEVICE_ID_KEY);
+  if (!deviceId) {
+    deviceId = `${Platform.OS}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    await storage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+  return deviceId;
+}
 
 export interface Profile {
   id: string;
@@ -24,6 +38,12 @@ interface ProfileContextValue {
   getProfileStorageKey: (key: string) => string;
   hasLegacyData: boolean;
   migrateLegacyData: () => Promise<Profile>;
+  // Cloud sync
+  syncServerUrl: string | null;
+  syncApiKey: string | null;
+  setSyncCredentials: (url: string, apiKey: string) => Promise<void>;
+  syncProfiles: () => Promise<boolean>;
+  lastSyncTime: number | null;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -38,11 +58,40 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasLegacyData, setHasLegacyData] = useState(false);
+  const [syncServerUrl, setSyncServerUrl] = useState<string | null>(null);
+  const [syncApiKey, setSyncApiKey] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
 
-  // Load profiles on mount
+  // Load profiles and sync config on mount
   useEffect(() => {
-    loadProfiles();
+    init();
   }, []);
+
+  const init = async () => {
+    const [url, key, did] = await Promise.all([
+      storage.getItem(SYNC_SERVER_URL_KEY),
+      storage.getItem(SYNC_API_KEY_KEY),
+      getOrCreateDeviceId(),
+    ]);
+    setSyncServerUrl(url);
+    setSyncApiKey(key);
+    setDeviceId(did);
+    await loadProfiles();
+    // Attempt cloud sync after loading local profiles (non-blocking, with timeout)
+    if (url && key && did) {
+      const syncWithTimeout = Promise.race([
+        syncFromCloud(did, url, key),
+        new Promise<boolean>(resolve => setTimeout(() => {
+          console.log('[ProfileSync] Startup sync timed out, continuing offline');
+          resolve(false);
+        }, 5000))
+      ]);
+      syncWithTimeout.catch(err => {
+        console.log('[ProfileSync] Startup sync failed, continuing offline:', err);
+      });
+    }
+  };
 
   const loadProfiles = async () => {
     try {
@@ -59,7 +108,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       let loadedProfiles: Profile[] = [];
       
       if (profilesJson) {
-        loadedProfiles = JSON.parse(profilesJson);
+        try {
+          loadedProfiles = JSON.parse(profilesJson);
+        } catch (parseErr) {
+          console.error('[ProfileContext] Error parsing profiles:', parseErr);
+        }
       }
       
       setProfiles(loadedProfiles);
@@ -79,9 +132,105 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Cloud sync functions
+  const setSyncCredentials = async (url: string, apiKey: string) => {
+    await storage.setItem(SYNC_SERVER_URL_KEY, url);
+    await storage.setItem(SYNC_API_KEY_KEY, apiKey);
+    setSyncServerUrl(url);
+    setSyncApiKey(apiKey);
+  };
+
+  const syncToCloud = async (did: string, url: string, key: string): Promise<boolean> => {
+    try {
+      const payload = {
+        profiles,
+        activeProfileId: activeProfile?.id || null,
+        syncedAt: Date.now(),
+      };
+      
+      const response = await fetch(`${url}/api/profiles/${did}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': key,
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      if (response.ok) {
+        setLastSyncTime(Date.now());
+        console.log('[ProfileSync] Uploaded to cloud');
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[ProfileSync] Upload failed:', err);
+      return false;
+    }
+  };
+
+  const syncFromCloud = async (did: string, url: string, key: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${url}/api/profiles/${did}`, {
+        headers: {
+          'Authorization': key,
+        },
+      });
+      
+      if (!response.ok) {
+        return false;
+      }
+      
+      const data = await response.json();
+      if (!data.found || !data.profiles) {
+        return false;
+      }
+      
+      // Merge server profiles with local (server wins for conflicts)
+      const serverProfiles: Profile[] = data.profiles.profiles || [];
+      const serverActiveId = data.profiles.activeProfileId;
+      
+      if (serverProfiles.length > 0) {
+        // Simple merge: use server profiles if they exist
+        // Future: could do smarter merge based on timestamps
+        await storage.setItem(PROFILES_KEY, JSON.stringify(serverProfiles));
+        setProfiles(serverProfiles);
+        
+        if (serverActiveId) {
+          await storage.setItem(ACTIVE_PROFILE_KEY, serverActiveId);
+          const active = serverProfiles.find(p => p.id === serverActiveId);
+          if (active) {
+            setActiveProfile(active);
+          }
+        }
+        
+        setLastSyncTime(Date.now());
+        console.log('[ProfileSync] Downloaded from cloud:', serverProfiles.length, 'profiles');
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[ProfileSync] Download failed:', err);
+      return false;
+    }
+  };
+
+  const syncProfiles = async (): Promise<boolean> => {
+    if (!deviceId || !syncServerUrl || !syncApiKey) {
+      console.log('[ProfileSync] No credentials configured');
+      return false;
+    }
+    // Upload current state
+    return syncToCloud(deviceId, syncServerUrl, syncApiKey);
+  };
+
   const saveProfiles = async (newProfiles: Profile[]) => {
     await storage.setItem(PROFILES_KEY, JSON.stringify(newProfiles));
     setProfiles(newProfiles);
+    // Auto-sync to cloud if configured
+    if (deviceId && syncServerUrl && syncApiKey) {
+      syncToCloud(deviceId, syncServerUrl, syncApiKey).catch(console.error);
+    }
     // Trigger auto-backup check after profile changes
     await autoBackup();
   };
@@ -181,18 +330,18 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     // Create profile from legacy data
     const profile = await createProfile('Default', PROFILE_COLORS[0]);
     
-    // Migrate credentials
+    // Migrate credentials to GLOBAL keys (server credentials are shared across profiles)
     if (legacyKavitaUrl) {
-      await storage.setItem(getProfileStorageKey('kavita_url'), legacyKavitaUrl);
+      await storage.setItem('folio_kavita_server_url', legacyKavitaUrl);
     }
     if (legacyKavitaKey) {
-      await storage.setItem(getProfileStorageKey('kavita_api_key'), legacyKavitaKey);
+      await storage.setItem('folio_kavita_api_key', legacyKavitaKey);
     }
     if (legacyAbsUrl) {
-      await storage.setItem(getProfileStorageKey('abs_url'), legacyAbsUrl);
+      await storage.setItem('folio_abs_server_url', legacyAbsUrl);
     }
     if (legacyAbsToken) {
-      await storage.setItem(getProfileStorageKey('abs_token'), legacyAbsToken);
+      await storage.setItem('folio_abs_api_key', legacyAbsToken);
     }
     
     // Clear legacy keys
@@ -203,7 +352,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     
     setHasLegacyData(false);
     return profile;
-  }, [createProfile, getProfileStorageKey]);
+  }, [createProfile]);
 
   const value: ProfileContextValue = {
     profiles,
@@ -216,6 +365,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     getProfileStorageKey,
     hasLegacyData,
     migrateLegacyData,
+    syncServerUrl,
+    syncApiKey,
+    setSyncCredentials,
+    syncProfiles,
+    lastSyncTime,
   };
 
   return (

@@ -6,7 +6,20 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { kavitaAPI, BookTocEntry, ChapterInfo } from '../../services/kavitaAPI';
 import { storage } from '../../services/storage';
 
-const STORAGE_KEY_FONT_SIZE = 'folio_epub_font_size';
+// Profile-scoped storage key for EPUB font size
+const BASE_STORAGE_KEY_FONT_SIZE = 'folio_epub_font_size';
+function getStorageKey(key: string): string {
+  const activeProfileId = typeof window !== 'undefined'
+    ? (window as any).__ACTIVE_PROFILE_ID
+    : null;
+  if (activeProfileId) {
+    return `folio_${activeProfileId}_${key}`;
+  }
+  return key;
+}
+const STORAGE_KEY_FONT_SIZE = {
+  get KEY() { return getStorageKey(BASE_STORAGE_KEY_FONT_SIZE); }
+};
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAudioPlayer } from '../../contexts/AudioPlayerContext';
 import { MINI_PLAYER_COMPACT_TOTAL_HEIGHT } from '../../components/MiniPlayer';
@@ -289,7 +302,7 @@ export default function EpubReaderScreen() {
 
   // Load persisted font size on mount
   useEffect(() => {
-    storage.getItem(STORAGE_KEY_FONT_SIZE).then(v => {
+    storage.getItem(STORAGE_KEY_FONT_SIZE.KEY).then(v => {
       if (!v) { fontSizeInitialized.current = true; return; }
       const n = parseInt(v, 10);
       if (Number.isFinite(n) && n >= 70 && n <= 200) {
@@ -303,7 +316,7 @@ export default function EpubReaderScreen() {
   // Also persist the new value (skip the initial render before storage loads).
   useEffect(() => {
     if (fontSizeInitialized.current) {
-      storage.setItem(STORAGE_KEY_FONT_SIZE, String(fontSize));
+      storage.setItem(STORAGE_KEY_FONT_SIZE.KEY, String(fontSize));
     }
     if (!rawHtml) return;
     setVisualPage(0);

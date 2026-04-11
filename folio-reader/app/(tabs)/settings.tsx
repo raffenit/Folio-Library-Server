@@ -339,6 +339,177 @@ function GoogleBooksConfigModal({ visible, onClose }: { visible: boolean; onClos
   );
 }
 
+// ── Cloud Sync Section Component ────────────────────────────────────────────
+
+function CloudSyncSection() {
+  const { colors } = useTheme();
+  const { syncServerUrl, syncApiKey, setSyncCredentials, syncProfiles, lastSyncTime } = useProfile();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [serverUrl, setServerUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [syncing, setSyncing] = useState(false);
+
+  const isConfigured = !!syncServerUrl && !!syncApiKey;
+
+  const handleSave = async () => {
+    if (!serverUrl.trim() || !apiKey.trim()) return;
+    await setSyncCredentials(serverUrl.trim(), apiKey.trim());
+    setModalVisible(false);
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await syncProfiles();
+    setSyncing(false);
+  };
+
+  const formatLastSync = () => {
+    if (!lastSyncTime) return 'Never';
+    const minutes = Math.floor((Date.now() - lastSyncTime) / 60000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Cloud Sync</Text>
+      <Text style={styles.sectionNote}>
+        Sync profiles across devices using your deploy server.
+      </Text>
+      <View style={styles.card}>
+        <SettingRow
+          icon="cloud-outline"
+          label="Profile Sync"
+          value={isConfigured ? 'Configured' : 'Not Set'}
+          statusText={isConfigured ? `Last sync: ${formatLastSync()}` : undefined}
+          statusOk={isConfigured}
+          onPress={() => {
+            if (!isConfigured) {
+              setServerUrl('');
+              setApiKey('');
+            } else {
+              setServerUrl(syncServerUrl || '');
+              setApiKey(syncApiKey || '');
+            }
+            setModalVisible(true);
+          }}
+        />
+        {isConfigured && (
+          <>
+            <View style={styles.divider} />
+            <SettingRow
+              icon="sync-outline"
+              label="Sync Now"
+              value={syncing ? 'Syncing...' : 'Upload profiles'}
+              onPress={handleSync}
+              loading={syncing}
+            />
+          </>
+        )}
+      </View>
+
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: Spacing.xl,
+        }}>
+          <View style={{
+            backgroundColor: colors.surface,
+            borderRadius: Radius.lg,
+            padding: Spacing.xl,
+            width: '100%',
+            maxWidth: 400,
+          }}>
+            <Text style={{ fontSize: Typography.lg, fontWeight: Typography.bold, color: colors.textPrimary, marginBottom: Spacing.md }}>
+              Cloud Sync Settings
+            </Text>
+            
+            <Text style={{ fontSize: Typography.sm, color: colors.textSecondary, marginBottom: Spacing.sm }}>
+              Server URL
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderRadius: Radius.md,
+                padding: Spacing.base,
+                color: colors.textPrimary,
+                fontSize: Typography.base,
+                marginBottom: Spacing.md,
+              }}
+              placeholder="http://your-server:9000"
+              placeholderTextColor={colors.textMuted}
+              value={serverUrl}
+              onChangeText={setServerUrl}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Text style={{ fontSize: Typography.sm, color: colors.textSecondary, marginBottom: Spacing.sm }}>
+              API Key
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: colors.surfaceElevated,
+                borderRadius: Radius.md,
+                padding: Spacing.base,
+                color: colors.textPrimary,
+                fontSize: Typography.base,
+                marginBottom: Spacing.lg,
+              }}
+              placeholder="Your secret key"
+              placeholderTextColor={colors.textMuted}
+              value={apiKey}
+              onChangeText={setApiKey}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.surfaceElevated,
+                  borderRadius: Radius.md,
+                  padding: Spacing.base,
+                  alignItems: 'center',
+                }}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={{ color: colors.textPrimary, fontSize: Typography.base }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.accent,
+                  borderRadius: Radius.md,
+                  padding: Spacing.base,
+                  alignItems: 'center',
+                }}
+                onPress={handleSave}
+              >
+                <Text style={{ color: colors.textOnAccent, fontSize: Typography.base, fontWeight: Typography.bold }}>
+                  Save
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
 // ── Server Card Component ───────────────────────────────────────────────────
 
 function ServerCard({
@@ -609,6 +780,9 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+
+        {/* Cloud Sync */}
+        <CloudSyncSection />
 
         {/* File Health */}
         {serverType === 'kavita' && (

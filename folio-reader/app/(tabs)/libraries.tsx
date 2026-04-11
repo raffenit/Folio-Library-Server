@@ -17,6 +17,7 @@ import { useSeriesContextMenu } from '../../hooks/useSeriesContextMenu';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Colors, Typography, Spacing, Radius } from '../../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 function LibraryTypeLabel(type: number): string {
   switch (type) {
@@ -41,8 +42,10 @@ export default function LibrariesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchLibraries = useCallback(async () => {
+    setError(null);
     try {
       const provider = LibraryFactory.getProvider(serverType === 'abs' ? 'abs' : 'kavita');
       const libs = await provider.getLibraries();
@@ -51,8 +54,10 @@ export default function LibrariesScreen() {
         await loadLibrarySeries(libs[0], 0);
         setSelectedLibrary(libs[0]);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to fetch libraries', e);
+      const isNetworkError = !e.response && (e.code === 'ECONNABORTED' || e.message?.includes('Network Error') || e.message?.includes('timeout'));
+      setError(isNetworkError ? 'Server unreachable. Check your connection or server URL in Settings.' : 'Failed to load libraries. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -100,6 +105,29 @@ export default function LibrariesScreen() {
     return (
       <View style={styles.centered}>
         <ActivityIndicator color={Colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  if (error && libraries.length === 0) {
+    return (
+      <View style={[styles.centered, { padding: Spacing.xl }]}>
+        <Ionicons name="cloud-offline-outline" size={64} color={Colors.textMuted} />
+        <Text style={{ color: Colors.textSecondary, marginTop: Spacing.md, textAlign: 'center' }}>
+          {error}
+        </Text>
+        <TouchableOpacity
+          style={{
+            marginTop: Spacing.lg,
+            backgroundColor: Colors.accent,
+            paddingHorizontal: Spacing.xl,
+            paddingVertical: Spacing.base,
+            borderRadius: Radius.md,
+          }}
+          onPress={fetchLibraries}
+        >
+          <Text style={{ color: Colors.background, fontWeight: '600' }}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }

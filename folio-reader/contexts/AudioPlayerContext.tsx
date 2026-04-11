@@ -11,7 +11,20 @@ import { DeviceEventEmitter } from 'react-native';
 import { absAPI, ABSLibraryItem, ABSAudioTrack, ABSPlaybackSession } from '../services/audiobookshelfAPI';
 import { storage } from '../services/storage';
 
-const STORAGE_KEY_RATE = 'folio_playback_rate';
+// Profile-scoped storage key for playback rate
+const BASE_STORAGE_KEY_RATE = 'folio_playback_rate';
+function getStorageKey(key: string): string {
+  const activeProfileId = typeof window !== 'undefined'
+    ? (window as any).__ACTIVE_PROFILE_ID
+    : null;
+  if (activeProfileId) {
+    return `folio_${activeProfileId}_${key}`;
+  }
+  return key;
+}
+const STORAGE_KEY_RATE = {
+  get RATE() { return getStorageKey(BASE_STORAGE_KEY_RATE); }
+};
 
 export interface NowPlaying {
   item: ABSLibraryItem;
@@ -55,7 +68,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   // Load persisted playback rate on mount
   useEffect(() => {
-    storage.getItem(STORAGE_KEY_RATE).then(v => {
+    storage.getItem(STORAGE_KEY_RATE.RATE).then(v => {
       if (!v) return;
       const r = parseFloat(v);
       if (Number.isFinite(r) && r > 0) {
@@ -303,7 +316,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         player.playbackRate = rate;
         savedRateRef.current = rate;
         setCurrentPlaybackRate(rate);
-        storage.setItem(STORAGE_KEY_RATE, String(rate));
+        storage.setItem(STORAGE_KEY_RATE.RATE, String(rate));
       },
       play,
       togglePlayPause,

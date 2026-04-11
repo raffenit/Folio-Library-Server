@@ -6,12 +6,37 @@ import {
   type ThemeName, type FontName, type ColorScheme, type CustomFont,
 } from '../constants/theme';
 
-const STORAGE_KEY_THEME = 'app_theme';
-const STORAGE_KEY_FONT = 'app_font';
-const STORAGE_KEY_CUSTOM_FONTS = 'app_custom_fonts_v1';
-const STORAGE_KEY_CUSTOM_COLORS = 'app_custom_theme_colors';
-const STORAGE_KEY_UI_GLOW = 'app_ui_glow';
-const STORAGE_KEY_UI_ANIMATIONS = 'app_ui_animations';
+// Profile-scoped storage keys (settings stored per profile)
+const BASE_STORAGE_KEYS = {
+  THEME: 'app_theme',
+  FONT: 'app_font',
+  CUSTOM_FONTS: 'app_custom_fonts_v1',
+  CUSTOM_COLORS: 'app_custom_theme_colors',
+  UI_GLOW: 'app_ui_glow',
+  UI_ANIMATIONS: 'app_ui_animations',
+  ACTIVE_CUSTOM_FONT: 'app_active_custom_font_id',
+};
+
+// Helper to get profile-scoped storage key
+function getStorageKey(key: string): string {
+  const activeProfileId = typeof window !== 'undefined'
+    ? (window as any).__ACTIVE_PROFILE_ID
+    : null;
+  if (activeProfileId) {
+    return `folio_${activeProfileId}_${key}`;
+  }
+  return key;
+}
+
+const STORAGE_KEYS = {
+  get THEME() { return getStorageKey(BASE_STORAGE_KEYS.THEME); },
+  get FONT() { return getStorageKey(BASE_STORAGE_KEYS.FONT); },
+  get CUSTOM_FONTS() { return getStorageKey(BASE_STORAGE_KEYS.CUSTOM_FONTS); },
+  get CUSTOM_COLORS() { return getStorageKey(BASE_STORAGE_KEYS.CUSTOM_COLORS); },
+  get UI_GLOW() { return getStorageKey(BASE_STORAGE_KEYS.UI_GLOW); },
+  get UI_ANIMATIONS() { return getStorageKey(BASE_STORAGE_KEYS.UI_ANIMATIONS); },
+  get ACTIVE_CUSTOM_FONT() { return getStorageKey(BASE_STORAGE_KEYS.ACTIVE_CUSTOM_FONT); },
+};
 
 interface ThemeContextType {
   themeName: ThemeName;
@@ -137,13 +162,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const t = await storage.getItem(STORAGE_KEY_THEME) as ThemeName | null;
-      const f = await storage.getItem(STORAGE_KEY_FONT);
-      const cf = await storage.getItem(STORAGE_KEY_CUSTOM_FONTS);
-      const customId = await storage.getItem('app_active_custom_font_id');
-      const cc = await storage.getItem(STORAGE_KEY_CUSTOM_COLORS);
-      const glow = await storage.getItem(STORAGE_KEY_UI_GLOW);
-      const animate = await storage.getItem(STORAGE_KEY_UI_ANIMATIONS);
+      const t = await storage.getItem(STORAGE_KEYS.THEME) as ThemeName | null;
+      const f = await storage.getItem(STORAGE_KEYS.FONT);
+      const cf = await storage.getItem(STORAGE_KEYS.CUSTOM_FONTS);
+      const customId = await storage.getItem(STORAGE_KEYS.ACTIVE_CUSTOM_FONT);
+      const cc = await storage.getItem(STORAGE_KEYS.CUSTOM_COLORS);
+      const glow = await storage.getItem(STORAGE_KEYS.UI_GLOW);
+      const animate = await storage.getItem(STORAGE_KEYS.UI_ANIMATIONS);
 
       if (t && themes[t]) setThemeName(t);
 
@@ -179,14 +204,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   async function setTheme(t: ThemeName) {
     setThemeName(t);
-    await storage.setItem(STORAGE_KEY_THEME, t);
+    await storage.setItem(STORAGE_KEYS.THEME, t);
   }
 
   async function setFont(f: FontName) {
     setFontName(f);
     setActiveCustomFontId(null);
-    await storage.setItem(STORAGE_KEY_FONT, f);
-    await storage.deleteItem('app_active_custom_font_id');
+    await storage.setItem(STORAGE_KEYS.FONT, f);
+    await storage.deleteItem(STORAGE_KEYS.ACTIVE_CUSTOM_FONT);
   }
 
   async function setCustomFont(id: string) {
@@ -194,8 +219,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!font) return;
     setFontName('georgia'); // base (overridden by activeCustomFontId)
     setActiveCustomFontId(id);
-    await storage.setItem(STORAGE_KEY_FONT, 'custom');
-    await storage.setItem('app_active_custom_font_id', id);
+    await storage.setItem(STORAGE_KEYS.FONT, 'custom');
+    await storage.setItem(STORAGE_KEYS.ACTIVE_CUSTOM_FONT, id);
   }
 
   async function addCustomFont(name: string, dataUrl: string): Promise<CustomFont> {
@@ -204,7 +229,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const updated = [...customFonts, font];
     setCustomFonts(updated);
     injectFontFace(font);
-    await storage.setItem(STORAGE_KEY_CUSTOM_FONTS, JSON.stringify(updated));
+    await storage.setItem(STORAGE_KEYS.CUSTOM_FONTS, JSON.stringify(updated));
     return font;
   }
 
@@ -216,21 +241,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setActiveCustomFontId(null);
       await setFont('georgia');
     }
-    await storage.setItem(STORAGE_KEY_CUSTOM_FONTS, JSON.stringify(updated));
+    await storage.setItem(STORAGE_KEYS.CUSTOM_FONTS, JSON.stringify(updated));
   }
 
   async function setCustomTheme(bg: string, accent: string) {
     const colors = { bg, accent };
     setCustomThemeColors(colors);
-    await storage.setItem(STORAGE_KEY_CUSTOM_COLORS, JSON.stringify(colors));
+    await storage.setItem(STORAGE_KEYS.CUSTOM_COLORS, JSON.stringify(colors));
     await setTheme('custom');
   }
 
   async function setUiEffects(glow: boolean, animations: boolean) {
     setUiGlowEnabled(glow);
     setUiAnimationsEnabled(animations);
-    await storage.setItem(STORAGE_KEY_UI_GLOW, glow ? 'true' : 'false');
-    await storage.setItem(STORAGE_KEY_UI_ANIMATIONS, animations ? 'true' : 'false');
+    await storage.setItem(STORAGE_KEYS.UI_GLOW, glow ? 'true' : 'false');
+    await storage.setItem(STORAGE_KEYS.UI_ANIMATIONS, animations ? 'true' : 'false');
   }
 
   // Resolve the CSS font-family string for the active selection

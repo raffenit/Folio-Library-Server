@@ -22,7 +22,7 @@ export default function LoginScreen() {
 
   // Show profile selector with logo header
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
       {/* Header */}
       <Animated.View 
         style={styles.header}

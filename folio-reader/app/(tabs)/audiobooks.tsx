@@ -77,6 +77,7 @@ export default function AudiobooksScreen() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   const fetchItems = useCallback(async (libraryId: string, pageNum: number, reset: boolean) => {
     console.log('[Audiobooks] fetchItems called with libraryId:', libraryId, 'page:', pageNum);
@@ -96,8 +97,12 @@ export default function AudiobooksScreen() {
       setPage(pageNum);
       // ABS total count is hard to get via generic interface for now, so we just check if we got a full page
       setHasMore(data.length === 40);
-    } catch (e) {
+    } catch (e: any) {
       console.error('[Audiobooks] Failed to fetch audiobook items:', e);
+      const isNetworkError = !e.response && (e.code === 'ECONNABORTED' || e.message?.includes('Network Error') || e.message?.includes('timeout'));
+      if (isNetworkError) {
+        setNetworkError('Server unreachable. Check your connection or ABS server URL in Settings.');
+      }
     } finally {
       setLoadingMore(false);
       setRefreshing(false);
@@ -141,8 +146,12 @@ export default function AudiobooksScreen() {
         console.log('[Audiobooks] No library selected, stopping load');
         setLoading(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Audiobooks] Initialization error:', err);
+      const isNetworkError = !err.response && (err.code === 'ECONNABORTED' || err.message?.includes('Network Error') || err.message?.includes('timeout'));
+      if (isNetworkError) {
+        setNetworkError('Server unreachable. Check your connection or ABS server URL in Settings.');
+      }
       setConnected(false);
       setLoading(false);
     }
@@ -166,6 +175,7 @@ export default function AudiobooksScreen() {
   }, [selectedLibraryId, fetchItems]);
 
   function onRefresh() {
+    setNetworkError(null);
     if (selectedLibraryId) {
       setRefreshing(true);
       fetchItems(selectedLibraryId, 0, true);
@@ -230,7 +240,26 @@ export default function AudiobooksScreen() {
         onSelectLibrary={selectLibrary}
       />
 
-      {loading ? (
+      {networkError && items.length === 0 ? (
+        <View style={[styles.centered, { padding: Spacing.xl }]}>
+          <Ionicons name="cloud-offline-outline" size={64} color={colors.textMuted} />
+          <Text style={{ color: colors.textSecondary, marginTop: Spacing.md, textAlign: 'center' }}>
+            {networkError}
+          </Text>
+          <TouchableOpacity
+            style={{
+              marginTop: Spacing.lg,
+              backgroundColor: colors.accent,
+              paddingHorizontal: Spacing.xl,
+              paddingVertical: Spacing.base,
+              borderRadius: Radius.md,
+            }}
+            onPress={onRefresh}
+          >
+            <Text style={{ color: colors.background, fontWeight: '600' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
