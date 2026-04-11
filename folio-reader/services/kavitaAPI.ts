@@ -351,8 +351,8 @@ class KavitaAPI {
   async login(): Promise<boolean> {
     try {
       console.log('[KavitaAPI] Login attempt to:', this.serverUrl);
-      // Use the apiKey to get a JWT
-      const response = await this.client.post('/api/Plugin/authenticate', null, {
+      // Use the apiKey to get a JWT (GET request, not POST)
+      const response = await this.client.get('/api/Plugin/authenticate', {
         params: { 
           apiKey: this.apiKey, 
           pluginName: 'Folio'

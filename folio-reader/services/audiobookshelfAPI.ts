@@ -278,8 +278,21 @@ class AudiobookshelfAPI {
     try {
       const res = await this.client.get('/api/libraries');
       console.log('[absAPI] Response status:', res.status);
-      console.log('[absAPI] Response data keys:', Object.keys(res.data || {}));
-      const libs = res.data?.libraries || (Array.isArray(res.data) ? res.data : []);
+      console.log('[absAPI] Response data type:', typeof res.data);
+      
+      // Handle string responses (needs JSON parse) or objects
+      let data = res.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+          console.log('[absAPI] Parsed JSON string response');
+        } catch (e) {
+          console.error('[absAPI] Failed to parse response as JSON:', e);
+          return [];
+        }
+      }
+      
+      const libs = data?.libraries || (Array.isArray(data) ? data : []);
       console.log('[absAPI] Parsed libraries:', libs.length, libs.map((l: any) => ({ id: l.id, name: l.name })));
       return libs;
     } catch (e: any) {
