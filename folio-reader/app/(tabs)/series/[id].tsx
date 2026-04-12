@@ -227,12 +227,18 @@ export default function SeriesDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Back button */}
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+      {/* Header with back button - matches ebook reader style */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.headerTitle} numberOfLines={1}>{displayName}</Text>
+        </View>
+        <View style={{ width: 24 }} />
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scroll}>
         <View style={isLargeScreen ? styles.heroRow : styles.heroSmall}>
           {/* Cover Section */}
           <View style={isLargeScreen ? styles.coverSidebarWrap : styles.coverSmallWrap}>
@@ -450,12 +456,13 @@ function makeStyles(c: ColorScheme) {
     container: { flex: 1, backgroundColor: c.background },
     centered: { flex: 1, backgroundColor: c.background, justifyContent: 'center' as const, alignItems: 'center' as const, gap: Spacing.md },
     scroll: { paddingBottom: 60 },
-    backButton: { position: 'absolute' as const, top: 44, left: Spacing.base, zIndex: 10, width: 38, height: 38, borderRadius: Radius.full, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center' as const, alignItems: 'center' as const },
+    header: { flexDirection: 'row' as const, alignItems: 'center' as const, padding: 10, paddingTop: 48, borderBottomWidth: 1, borderBottomColor: c.border },
+    headerTitle: { color: c.textPrimary, textAlign: 'center' as const, fontWeight: 'bold' as const, fontSize: 14, flex: 1 },
     heroSmall: { alignItems: 'center' as const },
-    heroRow: { flexDirection: 'row' as const, paddingTop: 60, paddingHorizontal: Spacing.xl, gap: Spacing.xl, alignItems: 'flex-start' as const },
+    heroRow: { flexDirection: 'row' as const, paddingTop: Spacing.xl, paddingHorizontal: Spacing.xl, gap: Spacing.xl, alignItems: 'flex-start' as const },
     coverSidebarWrap: { width: 200, borderRadius: Radius.md, overflow: 'hidden' as const, flexShrink: 0, position: 'relative' as const },
     coverSidebar: { width: 200, height: 280, borderRadius: Radius.md },
-    coverSmallWrap: { width: '100%', alignItems: 'center' as const, paddingTop: 52, paddingBottom: Spacing.lg, backgroundColor: c.surface, position: 'relative' as const },
+    coverSmallWrap: { width: '100%', alignItems: 'center' as const, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, backgroundColor: c.surface, position: 'relative' as const },
     coverSmall: { width: 140, height: 200, borderRadius: Radius.md },
     coverEditOverlay: { position: 'absolute' as const, bottom: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: Radius.full, width: 28, height: 28, justifyContent: 'center' as const, alignItems: 'center' as const },
     metaBlock: { padding: Spacing.base, paddingTop: Spacing.md, gap: Spacing.md },
