@@ -1,4 +1,6 @@
 import { SearchProvider, SearchMetadataResult } from './SearchProvider';
+import { storage } from './storage';
+import { STORAGE_KEYS } from '../constants/config';
 
 export class GoogleBooksSearchProvider implements SearchProvider {
   getSourceName(): string {
@@ -9,15 +11,33 @@ export class GoogleBooksSearchProvider implements SearchProvider {
     return 'google';
   }
 
+  private async buildSearchUrl(query: string, limit: number): Promise<string> {
+    const apiKey = await storage.getItem(STORAGE_KEYS.GOOGLE_BOOKS_API_KEY);
+    // Get browser locale or default to US
+    const country = typeof navigator !== 'undefined'
+      ? (navigator.language?.split('-')[1] || 'US')
+      : 'US';
+
+    let url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${limit}&printType=books&country=${country}`;
+
+    if (apiKey) {
+      url += `&key=${encodeURIComponent(apiKey)}`;
+    }
+
+    return url;
+  }
+
   async search(query: string, limit = 8): Promise<{ results: SearchMetadataResult[]; warning?: string }> {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=${limit}&printType=books`;
-    
+    const url = await this.buildSearchUrl(query, limit);
+
     try {
       const res = await fetch(`/proxy?url=${encodeURIComponent(url)}`);
-      
+
       if (!res.ok) {
         let warn = `Google Books search returned ${res.status}`;
-        if (res.status === 429) {
+        if (res.status === 403) {
+          warn = 'Google Books access denied. Try adding an API key in Settings > Google Books Search.';
+        } else if (res.status === 429) {
           warn = 'Google Books rate-limited (too many requests)';
         }
         return { results: [], warning: warn };
