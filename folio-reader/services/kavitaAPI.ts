@@ -453,6 +453,44 @@ class KavitaAPI {
     return response.data;
   }
 
+  // ── Book (EPUB/PDF) reader ───────────────────────────────────────────────────
+
+  async getBookInfo(chapterId: number): Promise<KavitaBookInfo> {
+    const key = this.apiKey;
+    const url = `/api/Reader/image?bookId=${chapterId}&pageNum=0&apiKey=${key}`;
+    const response = await this.client.get(url);
+    return response.data;
+  }
+
+  async getBookPage(chapterId: number, page: number): Promise<string> {
+    const url = `/api/Book/${chapterId}/book-page?page=${page}&apiKey=${this.apiKey}`;
+    const response = await this.client.get(url, { responseType: 'text' });
+    return response.data;
+  }
+
+  async getBookToc(chapterId: number): Promise<BookTocEntry[]> {
+    try {
+      const response = await this.client.get(`/api/Book/${chapterId}/chapters`);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error: any) {
+      // Some Kavita versions return 500 on this endpoint
+      // Return empty TOC so the reader can still load
+      console.warn(`[KavitaAPI] Failed to get TOC for chapter ${chapterId}:`, error?.response?.status);
+      return [];
+    }
+  }
+
+  async getChapterInfo(chapterId: number): Promise<ChapterInfo> {
+    const response = await this.client.get(`/api/Reader/chapter-info?chapterId=${chapterId}`);
+    // Kavita's chapter-info response does not include the chapterId itself — inject it.
+    return {
+      ...response.data,
+      chapterId,
+      pages: response.data.pages || response.data.pagesCount || 0,
+      lastReadPage: response.data.lastReadPage ?? 0
+    };
+  }
+
   // ── Series Metadata ──────────────────────────────────────────────────────────
 
   async getSeriesMetadata(seriesId: number): Promise<SeriesMetadata | null> {
@@ -563,47 +601,7 @@ class KavitaAPI {
     return response.data;
   }
 
-// ── Book (EPUB) reader ───────────────────────────────────────────────────────
-
-async getBookInfo(chapterId: number): Promise<KavitaBookInfo> {
-  // Added the apiKey parameter to the end of the URL string
-  const key = this.apiKey; 
-  const url = `/api/Reader/image?bookId=${chapterId}&pageNum=0&apiKey=${key}`;
-  const response = await this.client.get(url);
-  return response.data;
-}
-
-async getBookPage(chapterId: number, page: number): Promise<string> {
-  const url = `/api/Book/${chapterId}/book-page?page=${page}&apiKey=${this.apiKey}`;
-  const response = await this.client.get(url, { responseType: 'text' });
-  return response.data;
-}
-
-async getBookToc(chapterId: number): Promise<BookTocEntry[]> {
-    try {
-      const response = await this.client.get(`/api/Book/${chapterId}/chapters`);
-      return Array.isArray(response.data) ? response.data : [];
-    } catch (error: any) {
-      // Some Kavita versions return 500 on this endpoint
-      // Return empty TOC so the reader can still load
-      console.warn(`[KavitaAPI] Failed to get TOC for chapter ${chapterId}:`, error?.response?.status);
-      return [];
-    }
-  }
-
-  // ── Reader ──────────────────────────────────────────────────────────────────
-async getChapterInfo(chapterId: number): Promise<ChapterInfo> {
-  const response = await this.client.get(`/api/Reader/chapter-info?chapterId=${chapterId}`);
-  // Kavita's chapter-info response does not include the chapterId itself — inject it.
-  return {
-    ...response.data,
-    chapterId,
-    pages: response.data.pages || response.data.pagesCount || 0,
-    lastReadPage: response.data.lastReadPage ?? 0
-  };
-}
-
-// ── Reading progress ─────────────────────────────────────────────────────────
+  // ── Reading progress ─────────────────────────────────────────────────────────
 
   async getReadingProgress(chapterId: number): Promise<number> {
     try {
