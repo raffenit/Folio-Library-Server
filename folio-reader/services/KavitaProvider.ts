@@ -101,7 +101,8 @@ export class KavitaProvider implements LibraryProvider {
           pages: c.pages,
           pagesRead: c.pagesRead,
           coverImage: c.coverImage,
-          volumeId: v.id
+          volumeId: v.id,
+          format: c.files?.[0]?.format ?? 0
         }))
       }))
     };

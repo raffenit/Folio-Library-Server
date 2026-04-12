@@ -40,6 +40,7 @@ export interface LibraryChapter {
   pagesRead: number;
   coverImage?: string;
   volumeId: number | string;
+  format?: number; // 0=Unknown, 1=Archive(CBZ), 2=Unknown, 3=Epub, 4=PDF, 9=AZW3/MOBI
 }
 
 export interface LibrarySeriesDetail {

@@ -195,8 +195,9 @@ export default function SeriesDetailScreen() {
       title: displayName,
     };
 
-    // Use established format detection or default to epub for now
-    router.push({ pathname: '/reader/epub', params: navParams });
+    // Route to correct reader based on format: 4 = PDF
+    const pathname = chapter.format === 4 ? '/reader/pdf' : '/reader/epub';
+    router.push({ pathname, params: navParams });
   }
 
   function handleRead() {
