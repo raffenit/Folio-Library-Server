@@ -351,6 +351,9 @@ function CloudSyncSection() {
   const styles = makeStyles(colors);
 
   const isConfigured = !!syncServerUrl && !!syncApiKey;
+  
+  // Debug: log state on every render
+  console.log('[CloudSyncSection Debug] syncServerUrl:', syncServerUrl, 'syncApiKey:', syncApiKey ? '[SET]' : '[NULL]', 'isConfigured:', isConfigured);
 
   const handleSave = async () => {
     if (!serverUrl.trim() || !apiKey.trim()) return;

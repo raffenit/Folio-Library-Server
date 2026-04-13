@@ -287,7 +287,9 @@ class KavitaAPI {
         console.log('[KavitaAPI] Set server to:', this.serverUrl);
         const success = await this.login();
         if (success) {
-          console.log(`✅ Kavita Authenticated: ${this.serverUrl}`);
+          console.log(`✅ Kavita Authenticated (JWT): ${this.serverUrl}`);
+        } else if (this.apiKey) {
+          console.log(`✅ Kavita Connected (apiKey auth, no JWT): ${this.serverUrl}`);
         } else {
           console.warn('⚠️ Kavita credentials found but authentication failed.');
         }
