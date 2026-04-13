@@ -114,6 +114,15 @@ export function ProfileSelector({ onSelectProfile, onAddProfile }: ProfileSelect
   const [importError, setImportError] = useState<string | null>(null);
   const [importedProfiles, setImportedProfiles] = useState<Profile[] | null>(null);
 
+  // Debug: log credential changes
+  useEffect(() => {
+    console.log('[ProfileSelector] Credentials updated:', { 
+      syncServerUrl, 
+      syncApiKey: syncApiKey ? '[SET length:' + syncApiKey.length + ']' : '[NULL]',
+      loading 
+    });
+  }, [syncServerUrl, syncApiKey, loading]);
+
   const handleLegacyMigration = async () => {
     const profile = await migrateLegacyData();
     onSelectProfile(profile);
@@ -301,8 +310,13 @@ export function ProfileSelector({ onSelectProfile, onAddProfile }: ProfileSelect
             style={styles.cloudProfileCard}
             onPress={() => {
               // Pre-fill with stored credentials if available
+              console.log('[ProfileSelector] Opening cloud modal, stored credentials:', { 
+                syncServerUrl, 
+                syncApiKey: syncApiKey ? '[SET length:' + syncApiKey.length + ']' : '[NULL]' 
+              });
               setCloudUrl(syncServerUrl || '');
               setCloudApiKey(syncApiKey || '');
+              console.log('[ProfileSelector] Pre-filled cloud inputs');
               setShowCloudModal(true);
             }}
             activeOpacity={0.8}
@@ -405,6 +419,13 @@ function CloudImportModal({
   onSelectProfile,
 }: CloudImportModalProps) {
   const [discovering, setDiscovering] = useState(false);
+
+  // Debug: log received props
+  console.log('[CloudImportModal] Rendered with:', { 
+    visible, 
+    url, 
+    apiKey: apiKey ? '[SET length:' + apiKey.length + ']' : '[NULL]' 
+  });
 
   // Auto-discover server URL from well-known endpoints
   useEffect(() => {

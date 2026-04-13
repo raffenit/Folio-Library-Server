@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { AudioPlayerProvider } from '../contexts/AudioPlayerContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
-import { ProfileProvider } from '../contexts/ProfileContext';
+import { ProfileProvider, useProfile } from '../contexts/ProfileContext';
 import { View, ActivityIndicator, Platform } from 'react-native';
 import { Colors } from '../constants/theme';
 import { useTheme } from '../contexts/ThemeContext';
@@ -86,6 +86,7 @@ export default function RootLayout() {
 // 5. INNER NAVIGATION (Handles the actual Stack)
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { activeProfile } = useProfile();
   const { colors } = useTheme();
   const segments = useSegments();
   const router = useRouter();
@@ -95,13 +96,19 @@ function RootLayoutNav() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    // Allow navigation if authenticated OR if a profile is selected
+    const canAccessApp = isAuthenticated || !!activeProfile;
 
-    if (!isAuthenticated && !inAuthGroup) {
+    console.log('[NavGuard] Checking:', { isAuthenticated, hasProfile: !!activeProfile, inAuthGroup, segments });
+
+    if (!canAccessApp && !inAuthGroup) {
+      console.log('[NavGuard] Redirecting to login');
       router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
+    } else if (canAccessApp && inAuthGroup) {
+      console.log('[NavGuard] Redirecting to tabs');
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, activeProfile]);
 
   return (
     <View style={{ flex: 1, height: '100vh', backgroundColor: colors.background }}>

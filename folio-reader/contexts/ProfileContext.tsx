@@ -156,10 +156,25 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const syncToCloud = async (did: string, url: string, key: string): Promise<boolean> => {
     try {
+      // Get global server credentials to sync across devices
+      const [kavitaUrl, kavitaKey, absUrl, absToken, activeServerType] = await Promise.all([
+        storage.getItem('folio_kavita_server_url'),
+        storage.getItem('folio_kavita_api_key'),
+        storage.getItem('folio_abs_server_url'),
+        storage.getItem('folio_abs_api_key'),
+        storage.getItem('folio_active_server_type'),
+      ]);
+      
       const payload = {
         profiles,
         activeProfileId: activeProfile?.id || null,
         syncedAt: Date.now(),
+        // Global server config - shared across all devices
+        serverConfig: {
+          kavita: { url: kavitaUrl, apiKey: kavitaKey },
+          abs: { url: absUrl, apiKey: absToken },
+          activeServerType,
+        },
       };
       
       const response = await fetch(`${url}/api/profiles/${did}`, {
@@ -173,7 +188,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       
       if (response.ok) {
         setLastSyncTime(Date.now());
-        console.log('[ProfileSync] Uploaded to cloud');
+        console.log('[ProfileSync] Uploaded to cloud with server config');
         return true;
       }
       return false;
@@ -216,6 +231,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           if (active) {
             setActiveProfile(active);
           }
+        }
+        
+        // Restore global server config if present
+        const serverConfig = data.profiles.serverConfig;
+        if (serverConfig) {
+          console.log('[ProfileSync] Restoring server config from cloud');
+          if (serverConfig.kavita?.url) await storage.setItem('folio_kavita_server_url', serverConfig.kavita.url);
+          if (serverConfig.kavita?.apiKey) await storage.setItem('folio_kavita_api_key', serverConfig.kavita.apiKey);
+          if (serverConfig.abs?.url) await storage.setItem('folio_abs_server_url', serverConfig.abs.url);
+          if (serverConfig.abs?.apiKey) await storage.setItem('folio_abs_api_key', serverConfig.abs.apiKey);
+          if (serverConfig.activeServerType) await storage.setItem('folio_active_server_type', serverConfig.activeServerType);
         }
         
         setLastSyncTime(Date.now());
@@ -370,18 +396,25 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   // Import profiles from cloud (for setup on new devices)
   const importCloudProfiles = useCallback(async (url: string, apiKey: string): Promise<{ success: boolean; profiles?: Profile[]; error?: string }> => {
+    console.log('[importCloudProfiles] Starting with url:', url, 'apiKey:', apiKey ? '[SET]' : '[NULL]');
     try {
       // Get or create device ID
       const did = await getOrCreateDeviceId();
+      console.log('[importCloudProfiles] Device ID:', did);
       
       // Fetch profiles from cloud
-      const response = await fetch(`${url}/api/profiles/${did}`, {
+      const fetchUrl = `${url}/api/profiles/${did}`;
+      console.log('[importCloudProfiles] Fetching:', fetchUrl);
+      const response = await fetch(fetchUrl, {
         headers: {
           'Authorization': apiKey,
         },
       });
       
+      console.log('[importCloudProfiles] Response status:', response.status);
+      
       if (!response.ok) {
+        console.log('[importCloudProfiles] Response not ok:', response.status);
         if (response.status === 404) {
           return { success: false, error: 'No profiles found on server. Create a profile first on another device.' };
         }
@@ -405,6 +438,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       await storage.setItem(SYNC_API_KEY_KEY, apiKey);
       setSyncServerUrl(url);
       setSyncApiKey(apiKey);
+      
+      // Restore global server config if present
+      const serverConfig = data.profiles.serverConfig;
+      if (serverConfig) {
+        console.log('[importCloudProfiles] Restoring server config');
+        if (serverConfig.kavita?.url) await storage.setItem('folio_kavita_server_url', serverConfig.kavita.url);
+        if (serverConfig.kavita?.apiKey) await storage.setItem('folio_kavita_api_key', serverConfig.kavita.apiKey);
+        if (serverConfig.abs?.url) await storage.setItem('folio_abs_server_url', serverConfig.abs.url);
+        if (serverConfig.abs?.apiKey) await storage.setItem('folio_abs_api_key', serverConfig.abs.apiKey);
+        if (serverConfig.activeServerType) await storage.setItem('folio_active_server_type', serverConfig.activeServerType);
+      }
       
       // Set active profile if server had one
       if (serverActiveId) {
