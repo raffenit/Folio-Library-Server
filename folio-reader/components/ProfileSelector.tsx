@@ -252,7 +252,23 @@ export function ProfileSelector({ onSelectProfile, onAddProfile }: ProfileSelect
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Who's reading?</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Who's reading?</Text>
+        {profiles.length > 0 && (
+          <TouchableOpacity
+            style={styles.syncButton}
+            onPress={() => {
+              console.log('[ProfileSelector] Manual sync triggered');
+              setCloudUrl(syncServerUrl || '');
+              setCloudApiKey(syncApiKey || '');
+              setShowCloudModal(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="cloud-download" size={20} color={Colors.accent} />
+          </TouchableOpacity>
+        )}
+      </View>
       
       <ScrollView contentContainerStyle={styles.profilesGrid}>
         {profiles.map((profile) => (
@@ -304,29 +320,27 @@ export function ProfileSelector({ onSelectProfile, onAddProfile }: ProfileSelect
           <Text style={styles.addProfileText}>Add Profile</Text>
         </TouchableOpacity>
 
-        {/* Load from Cloud Button - shown when no profiles exist */}
-        {profiles.length === 0 && (
-          <TouchableOpacity
-            style={styles.cloudProfileCard}
-            onPress={() => {
-              // Pre-fill with stored credentials if available
-              console.log('[ProfileSelector] Opening cloud modal, stored credentials:', { 
-                syncServerUrl, 
-                syncApiKey: syncApiKey ? '[SET length:' + syncApiKey.length + ']' : '[NULL]' 
-              });
-              setCloudUrl(syncServerUrl || '');
-              setCloudApiKey(syncApiKey || '');
-              console.log('[ProfileSelector] Pre-filled cloud inputs');
-              setShowCloudModal(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={styles.cloudAvatar}>
-              <Ionicons name="cloud-download" size={32} color={Colors.accent} />
-            </View>
-            <Text style={styles.cloudProfileText}>Load from Cloud</Text>
-          </TouchableOpacity>
-        )}
+        {/* Load from Cloud Button - always available */}
+        <TouchableOpacity
+          style={styles.cloudProfileCard}
+          onPress={() => {
+            // Pre-fill with stored credentials if available
+            console.log('[ProfileSelector] Opening cloud modal, stored credentials:', { 
+              syncServerUrl, 
+              syncApiKey: syncApiKey ? '[SET length:' + syncApiKey.length + ']' : '[NULL]' 
+            });
+            setCloudUrl(syncServerUrl || '');
+            setCloudApiKey(syncApiKey || '');
+            console.log('[ProfileSelector] Pre-filled cloud inputs');
+            setShowCloudModal(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={styles.cloudAvatar}>
+            <Ionicons name="cloud-download" size={32} color={Colors.accent} />
+          </View>
+          <Text style={styles.cloudProfileText}>Load from Cloud</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Add Profile Modal */}
@@ -708,6 +722,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: Spacing.xl * 2,
     fontFamily: Typography.serif,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: 500,
+    marginBottom: Spacing.xl,
+  },
+  syncButton: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(139, 94, 60, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   subtitle: {
     fontSize: Typography.md,
