@@ -136,7 +136,7 @@ function FilterRowNoLabel<T extends { id: number; title?: string; label?: string
             active={active}
             colors={colors}
             onPress={() => onSelect(item.id)}
-            onLongPress={onChipContextMenu ? (x, y) => onChipContextMenu(item, x, y) : undefined}
+            onContextMenu={onChipContextMenu ? (x, y) => onChipContextMenu(item, x, y) : undefined}
           />
         );
       })}

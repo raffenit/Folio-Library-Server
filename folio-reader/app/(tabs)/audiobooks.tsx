@@ -13,6 +13,8 @@ import { Colors, Typography, Spacing, Radius } from '../../constants/theme';
 import TabHeader from '../../components/TabHeader';
 import { useTheme } from '../../contexts/ThemeContext';
 import GenreTagContextMenu, { ChipType } from '../../components/GenreTagContextMenu';
+import SeriesContextMenu from '../../components/SeriesContextMenu';
+import { useSeriesContextMenu } from '../../hooks/useSeriesContextMenu';
 
 interface FilterItem {
   id: string;
@@ -343,22 +345,45 @@ function ContinueListeningCard({ item, onPress, onPlay, isPlaying }: {
 }
 
 // ── Audiobook Card for Grid ──
-function AudiobookCard({ item, onPress, onPlay, isPlaying, cardWidth }: {
+function AudiobookCard({ item, onPress, onPlay, isPlaying, cardWidth, onContextMenu }: {
   item: LibraryItem;
   onPress: () => void;
   onPlay: () => void;
   isPlaying: boolean;
   cardWidth: number;
+  onContextMenu?: (itemId: string, itemTitle: string, x: number, y: number) => void;
 }) {
   const { colors } = useTheme();
   const progressPct = item.progress ? Math.round(item.progress * 100) : 0;
   const provider = LibraryFactory.getProvider('abs');
   const coverUri = (provider as any).getCoverUrl?.(item.id) || '';
+  const cardRef = React.useRef<View>(null);
+
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || !onContextMenu) return;
+    const el = cardRef.current as any as HTMLElement;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      e.preventDefault();
+      onContextMenu(item.id, item.title, e.clientX, e.clientY);
+    };
+    el.addEventListener('contextmenu', handler);
+    return () => el.removeEventListener('contextmenu', handler);
+  }, [onContextMenu, item.id, item.title]);
+
+  function handleLongPress(e: GestureResponderEvent) {
+    if (onContextMenu) {
+      onContextMenu(item.id, item.title, e.nativeEvent.pageX, e.nativeEvent.pageY);
+    }
+  }
 
   return (
     <TouchableOpacity 
+      ref={cardRef}
       style={[styles.card, { width: cardWidth, backgroundColor: '#1e2132', borderColor: 'rgba(255, 255, 255, 0.08)' }, Platform.OS === 'web' && (styles.cardHover as any)]} 
       onPress={onPress} 
+      onLongPress={onContextMenu ? handleLongPress : undefined}
+      delayLongPress={400}
       activeOpacity={0.85}
       {...(Platform.OS === 'web' ? { className: 'audiobook-card-hover' } : {})}
     >
@@ -428,6 +453,7 @@ export default function AudiobooksScreen() {
   const { colors } = useTheme();
   const { nowPlaying, isPlaying, play, togglePlayPause } = useAudioPlayer();
   const { numColumns, cardWidth } = useGridColumns();
+  const { ctx: ctxMenu, openMenu, closeMenu, openDetail } = useSeriesContextMenu();
 
   const [connected, setConnected] = useState(true);
   const [libraries, setLibraries] = useState<any[]>([]);
@@ -1215,6 +1241,7 @@ export default function AudiobooksScreen() {
               onPress={() => router.push(`/audiobook/${item.id}`)}
               onPlay={() => handlePlay(item)}
               isPlaying={isPlaying && nowPlaying?.item.id === item.id}
+              onContextMenu={(id, title, x, y) => openMenu(id, title, x, y, 'abs')}
             />
           )}
         />
@@ -1243,6 +1270,15 @@ export default function AudiobooksScreen() {
         onAdded={() => {
           closeChipMenu();
         }}
+      />
+
+      <SeriesContextMenu
+        visible={ctxMenu.visible}
+        seriesId={ctxMenu.seriesId}
+        seriesName={ctxMenu.seriesName}
+        position={ctxMenu.position}
+        onClose={closeMenu}
+        onOpenDetail={openDetail}
       />
     </View>
   );
