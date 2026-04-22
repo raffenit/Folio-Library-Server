@@ -7,9 +7,9 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
-  Platform,
   ScrollView,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { LibraryFactory } from '@/services/LibraryFactory';
 import { SearchFactory } from '@/services/SearchFactory';
 import { SearchMetadataResult } from '@/services/SearchProvider';
@@ -71,13 +71,41 @@ export function CoverPickerModal({
   }, [mode]);
 
   async function pickFromDevice() {
-    if (Platform.OS !== 'web') {
-      setError('File upload requires the web version.');
-      return;
+    try {
+      // Request permission on mobile
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Permission to access media library is required.');
+        return;
+      }
+
+      // Launch image picker with different aspect ratios for ebooks vs audiobooks
+      const aspect: [number, number] = providerType === 'abs' ? [1, 1] : [2, 3];
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect,
+        quality: 0.9,
+        base64: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (asset.base64) {
+        // Construct data URL from base64
+        const mimeType = asset.mimeType || 'image/jpeg';
+        const dataUrl = `data:${mimeType};base64,${asset.base64}`;
+        await upload(dataUrl);
+      } else if (asset.uri) {
+        // Fall back to URI if base64 not available
+        await upload(asset.uri);
+      }
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to pick image');
     }
-    const base64 = await pickFileWeb();
-    if (!base64) return;
-    await upload(base64);
   }
 
   async function upload(urlOrBase64: string) {
@@ -115,23 +143,7 @@ export function CoverPickerModal({
     }
   }
 
-  function pickFileWeb(): Promise<string | null> {
-    return new Promise((resolve) => {
-      if (typeof document === 'undefined') { resolve(null); return; }
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = () => {
-        const file = input.files?.[0];
-        if (!file) { resolve(null); return; }
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(file);
-      };
-      input.click();
-    });
-  }
+  // Note: pickFromDevice now uses expo-image-picker for cross-platform support
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>

@@ -697,10 +697,8 @@ class KavitaAPI {
   // ── Cover upload ─────────────────────────────────────────────────────────────
 
   async uploadSeriesCover(seriesId: number, base64DataUrl: string): Promise<void> {
-    // Strip data URL prefix — Kavita expects raw base64
-    const url = base64DataUrl.startsWith('data:')
-      ? base64DataUrl.replace(/^data:[^;]+;base64,/, '')
-      : base64DataUrl;
+    // Send full data URL — Kavita's /api/Upload/series endpoint accepts data URLs
+    const url = base64DataUrl;
     try {
       await this.client.post('/api/Upload/series', { id: seriesId, url });
     } catch (e: any) {
