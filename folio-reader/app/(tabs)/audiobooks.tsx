@@ -438,13 +438,16 @@ const SIDE_MARGIN = Spacing.base;
 
 function useGridColumns() {
   const { width } = useWindowDimensions();
+  // Account for scrollbar width on web to prevent grid from being cut off
+  const SCROLLBAR_WIDTH = Platform.OS === 'web' ? 16 : 0;
+  const availableWidth = width - SCROLLBAR_WIDTH;
   const numColumns =
-    width >= 1600 ? 8 :
-    width >= 1280 ? 7 :
-    width >= 960  ? 6 :
-    width >= 700  ? 5 :
-    width >= 500  ? 4 : 3;
-  const cardWidth = (width - SIDE_MARGIN * 2 - GAP * (numColumns - 1)) / numColumns;
+    availableWidth >= 1600 ? 8 :
+    availableWidth >= 1280 ? 7 :
+    availableWidth >= 960  ? 6 :
+    availableWidth >= 700  ? 5 :
+    availableWidth >= 500  ? 4 : 3;
+  const cardWidth = (availableWidth - SIDE_MARGIN * 2 - GAP * (numColumns - 1)) / numColumns;
   return { numColumns, cardWidth };
 }
 
@@ -913,10 +916,8 @@ export default function AudiobooksScreen() {
                           borderBottomRightRadius: 0,
                           backgroundColor: activeFilterTab === 'library' && Platform.OS !== 'web' ? colors.accent : 'transparent',
                           ...(Platform.OS === 'web' && activeFilterTab === 'library' ? { background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.secondary} 40%, #8B6DB8 70%, #A85A95 100%)` } : {}),
-                          borderTopWidth: 2,
                           borderLeftWidth: activeFilterTab === 'library' ? 1 : 0,
                           borderRightWidth: activeFilterTab === 'library' ? 1 : 0,
-                          borderTopColor: activeFilterTab === 'library' ? colors.accent : 'transparent',
                           borderLeftColor: colors.border,
                           borderRightColor: colors.border,
                           marginBottom: -1,
@@ -941,10 +942,8 @@ export default function AudiobooksScreen() {
                         borderBottomRightRadius: 0,
                         backgroundColor: activeFilterTab === 'genre' && Platform.OS !== 'web' ? colors.accent : 'transparent',
                         ...(Platform.OS === 'web' && activeFilterTab === 'genre' ? { background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.secondary} 40%, #8B6DB8 70%, #A85A95 100%)` } : {}),
-                        borderTopWidth: 2,
                         borderLeftWidth: activeFilterTab === 'genre' ? 1 : 0,
                         borderRightWidth: activeFilterTab === 'genre' ? 1 : 0,
-                        borderTopColor: activeFilterTab === 'genre' ? colors.accent : 'transparent',
                         borderLeftColor: colors.border,
                         borderRightColor: colors.border,
                         marginBottom: -1,
@@ -968,10 +967,8 @@ export default function AudiobooksScreen() {
                         borderBottomRightRadius: 0,
                         backgroundColor: activeFilterTab === 'author' && Platform.OS !== 'web' ? colors.accent : 'transparent',
                         ...(Platform.OS === 'web' && activeFilterTab === 'author' ? { background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.secondary} 40%, #8B6DB8 70%, #A85A95 100%)` } : {}),
-                        borderTopWidth: 2,
                         borderLeftWidth: activeFilterTab === 'author' ? 1 : 0,
                         borderRightWidth: activeFilterTab === 'author' ? 1 : 0,
-                        borderTopColor: activeFilterTab === 'author' ? colors.accent : 'transparent',
                         borderLeftColor: colors.border,
                         borderRightColor: colors.border,
                         marginBottom: -1,
@@ -995,10 +992,8 @@ export default function AudiobooksScreen() {
                         borderBottomRightRadius: 0,
                         backgroundColor: activeFilterTab === 'tag' && Platform.OS !== 'web' ? colors.accent : 'transparent',
                         ...(Platform.OS === 'web' && activeFilterTab === 'tag' ? { background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.secondary} 40%, #8B6DB8 70%, #A85A95 100%)` } : {}),
-                        borderTopWidth: 2,
                         borderLeftWidth: activeFilterTab === 'tag' ? 1 : 0,
                         borderRightWidth: activeFilterTab === 'tag' ? 1 : 0,
-                        borderTopColor: activeFilterTab === 'tag' ? colors.accent : 'transparent',
                         borderLeftColor: colors.border,
                         borderRightColor: colors.border,
                         marginBottom: -1,
@@ -1022,10 +1017,8 @@ export default function AudiobooksScreen() {
                         borderBottomRightRadius: 0,
                         backgroundColor: activeFilterTab === 'collection' && Platform.OS !== 'web' ? colors.accent : 'transparent',
                         ...(Platform.OS === 'web' && activeFilterTab === 'collection' ? { background: `linear-gradient(135deg, ${colors.accent} 0%, ${colors.secondary} 40%, #8B6DB8 70%, #A85A95 100%)` } : {}),
-                        borderTopWidth: 2,
                         borderLeftWidth: activeFilterTab === 'collection' ? 1 : 0,
                         borderRightWidth: activeFilterTab === 'collection' ? 1 : 0,
-                        borderTopColor: activeFilterTab === 'collection' ? colors.accent : 'transparent',
                         borderLeftColor: colors.border,
                         borderRightColor: colors.border,
                         marginBottom: -1,
@@ -1279,6 +1272,7 @@ export default function AudiobooksScreen() {
         position={ctxMenu.position}
         onClose={closeMenu}
         onOpenDetail={openDetail}
+        provider={ctxMenu.provider}
       />
     </View>
   );

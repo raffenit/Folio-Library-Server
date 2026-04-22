@@ -34,6 +34,7 @@ interface Props {
   position: ContextMenuPosition;
   onClose: () => void;
   onOpenDetail?: () => void;
+  provider?: 'kavita' | 'abs' | null;
 }
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -50,7 +51,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
 }
 
 export default function SeriesContextMenu({
-  visible, seriesId, seriesName, position, onClose, onOpenDetail,
+  visible, seriesId, seriesName, position, onClose, onOpenDetail, provider,
 }: Props) {
   const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
@@ -83,6 +84,15 @@ export default function SeriesContextMenu({
     if (numericSeriesId == null) return;
     setLoading(true);
     try {
+      // Skip Kavita-specific data loading for ABS items
+      if (provider === 'abs') {
+        setMetadata(null);
+        setAllGenres([]);
+        setAllTags([]);
+        setAllCollections([]);
+        setCollectionsWithSeries(new Set());
+        return;
+      }
       const [meta, genres, tags, colls] = await Promise.all([
         kavitaAPI.getSeriesMetadata(numericSeriesId),
         kavitaAPI.getGenres(),
@@ -98,10 +108,12 @@ export default function SeriesContextMenu({
       await Promise.all(
         colls.map(async (c) => {
           const series = await kavitaAPI.getSeriesForCollection(c.id);
-          if (series.some(s => s.id === numericSeriesId)) inColls.add(c.id);
+          if (series?.some(s => s.id === numericSeriesId)) inColls.add(c.id);
         })
       );
       setCollectionsWithSeries(inColls);
+    } catch (e) {
+      console.error('[SeriesContextMenu] Failed to load data', e);
     } finally {
       setLoading(false);
     }
