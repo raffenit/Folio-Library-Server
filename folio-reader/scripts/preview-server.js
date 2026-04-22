@@ -310,7 +310,7 @@ function handleABSCoverProxy(req, res) {
       const boundary = '----FolioFormBoundary' + Math.random().toString(36).substring(2);
       const preAmble = Buffer.from(
         `--${boundary}\r\n` +
-        `Content-Disposition: form-data; name="file"; filename="cover.${extension}"\r\n` +
+        `Content-Disposition: form-data; name="cover"; filename="cover.${extension}"\r\n` +
         `Content-Type: ${contentType}\r\n\r\n`
       );
       const postAmble = Buffer.from(`\r\n--${boundary}--\r\n`);
