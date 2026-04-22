@@ -28,8 +28,8 @@ export default function TabHeader({ title, count, countLabel, hasMore, serverNam
       paddingHorizontal: Spacing.base,
       borderBottomWidth: 1,
       borderBottomColor: Platform.OS === 'web' ? 'transparent' : colors.border,
-      backdropFilter: Platform.OS === 'web' ? 'blur(12px) saturate(150%)' : undefined,
-      WebkitBackdropFilter: Platform.OS === 'web' ? 'blur(12px) saturate(150%)' : undefined,
+      backdropFilter: Platform.OS === 'web' ? 'blur(4px)' : undefined,
+      WebkitBackdropFilter: Platform.OS === 'web' ? 'blur(4px)' : undefined,
     } as any}>
       {/* Subtle gradient underline */}
       {Platform.OS === 'web' && (

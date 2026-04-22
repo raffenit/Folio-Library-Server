@@ -65,6 +65,8 @@ export function EditMetadataModal({
   const [collectionsWithSeries, setCollectionsWithSeries] = useState<Set<string | number>>(new Set());
   const [tab, setTab] = useState<'info' | 'genres' | 'tags' | 'collections'>('info');
   const [editSummary, setEditSummary] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editAuthor, setEditAuthor] = useState('');
   const [genreSearch, setGenreSearch] = useState('');
   const [tagSearch, setTagSearch] = useState('');
   const tempIdRef = useRef(-1);
@@ -87,6 +89,8 @@ export function EditMetadataModal({
       ]);
       setMetadata(meta);
       setEditSummary(meta?.summary ?? meta?.description ?? '');
+      setEditName(meta?.localizedName || meta?.name || '');
+      setEditAuthor(meta?.authorName || '');
       setAllGenres(genres);
       setAllTags(tags);
       setAllCollections(colls);
@@ -137,9 +141,12 @@ export function EditMetadataModal({
     if (!metadata) return;
     setSaving(true);
     try {
-      // 1. Update metadata (summary, genres, tags)
+      // 1. Update metadata (name, author, summary, genres, tags)
       const savePayload = {
         ...metadata,
+        name: editName,
+        localizedName: editName,
+        authorName: editAuthor,
         summary: editSummary,
         // In some systems, newly created genres/tags might need id: 0
         genres: metadata.genres.map(g => typeof g.id === 'string' && g.id.startsWith('temp-') ? { ...g, id: 0 } : g),
@@ -245,6 +252,24 @@ export function EditMetadataModal({
           <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
             {tab === 'info' && (
               <View style={styles.infoTab}>
+                <Text style={styles.fieldLabel}>Title</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="Series title…"
+                  placeholderTextColor={Colors.textMuted}
+                />
+                
+                <Text style={styles.fieldLabel}>Author</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  value={editAuthor}
+                  onChangeText={setEditAuthor}
+                  placeholder="Author name…"
+                  placeholderTextColor={Colors.textMuted}
+                />
+                
                 <Text style={styles.fieldLabel}>Description</Text>
                 <TextInput
                   style={styles.summaryInput}

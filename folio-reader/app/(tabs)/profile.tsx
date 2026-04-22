@@ -142,10 +142,11 @@ export default function ProfileScreen() {
       backdropFilter: Platform.OS === 'web' ? 'blur(4px)' : undefined,
     } as any}>
       <TabHeader title="Profile" />
+      <View style={{ height: Spacing.md }} />
       
       {/* Profile Header Card */}
       <View style={{
-        backgroundColor: 'rgba(30, 33, 50, 0.5)',
+        backgroundColor: Platform.OS === 'web' ? `${colors.surface}80` : colors.surface,
         margin: Spacing.md,
         borderRadius: Radius.lg,
         padding: Spacing.lg,
@@ -153,8 +154,9 @@ export default function ProfileScreen() {
         alignItems: 'center',
         gap: Spacing.md,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-      }}>
+        borderColor: colors.border,
+        backdropFilter: Platform.OS === 'web' ? 'blur(12px)' : undefined,
+      } as any}>
         {/* Avatar */}
         <TouchableOpacity onPress={openEditModal} activeOpacity={0.8}>
           {activeProfile.avatar ? (
@@ -216,11 +218,11 @@ export default function ProfileScreen() {
           onPress={() => setSwitchModalVisible(true)}
           style={{
             padding: Spacing.sm,
-            backgroundColor: 'rgba(45, 48, 70, 0.6)',
+            backgroundColor: Platform.OS === 'web' ? `${colors.surface}60` : colors.surfaceElevated,
             borderRadius: Radius.md,
             borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-          }}
+            borderColor: colors.border,
+          } as any}
         >
           <Ionicons name="swap-horizontal" size={24} color={colors.accent} />
         </TouchableOpacity>

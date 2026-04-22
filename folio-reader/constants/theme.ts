@@ -53,8 +53,8 @@ export const defaultCustomTheme: ColorScheme = {
   secondary: '#ffea4a',
   secondarySoft: 'rgba(255, 234, 74, 0.15)',
   textPrimary: '#f0ead8',
-  textSecondary: '#9a9098',
-  textMuted: '#5a5568',
+  textSecondary: '#b8b0b0',
+  textMuted: '#7a7588',
   textOnAccent: '#0d0d12',
   success: '#4caf7d',
   error: '#e05c5c',
@@ -78,8 +78,8 @@ export const themes: Record<ThemeName, ColorScheme> = {
     secondary: '#ffea4a',
     secondarySoft: 'rgba(255, 234, 74, 0.15)',
     textPrimary: '#f0ead8',
-    textSecondary: '#9a9098',
-    textMuted: '#5a5568',
+    textSecondary: '#b8b0b0',
+    textMuted: '#7a7588',
     textOnAccent: '#0d0d12',
     success: '#4caf7d',
     error: '#e05c5c',
@@ -101,8 +101,8 @@ export const themes: Record<ThemeName, ColorScheme> = {
     secondary: '#00f0e0',
     secondarySoft: 'rgba(0, 240, 224, 0.15)',
     textPrimary: '#f0eeff',
-    textSecondary: '#9090a8',
-    textMuted: '#505060',
+    textSecondary: '#a8a8c0',
+    textMuted: '#707080',
     textOnAccent: '#ffffff',
     success: '#4caf7d',
     error: '#e05c5c',
@@ -124,8 +124,8 @@ export const themes: Record<ThemeName, ColorScheme> = {
     secondary: '#ffc947',
     secondarySoft: 'rgba(255, 201, 71, 0.15)',
     textPrimary: '#ede0c8',
-    textSecondary: '#9a8c78',
-    textMuted: '#5e5244',
+    textSecondary: '#b8a890',
+    textMuted: '#7a6a58',
     textOnAccent: '#13100a',
     success: '#5aad6a',
     error: '#e05c5c',
@@ -147,8 +147,8 @@ export const themes: Record<ThemeName, ColorScheme> = {
     secondary: '#00e0c0',
     secondarySoft: 'rgba(0, 224, 192, 0.15)',
     textPrimary: '#e8f0f8',
-    textSecondary: '#8898ac',
-    textMuted: '#4a5a6c',
+    textSecondary: '#a0b0c8',
+    textMuted: '#687898',
     textOnAccent: '#060c14',
     success: '#4caf7d',
     error: '#e05c5c',
@@ -170,8 +170,8 @@ export const themes: Record<ThemeName, ColorScheme> = {
     secondary: '#c8ff4a',
     secondarySoft: 'rgba(200, 255, 74, 0.15)',
     textPrimary: '#e8f0e8',
-    textSecondary: '#88a088',
-    textMuted: '#4a5e4a',
+    textSecondary: '#a0b8a0',
+    textMuted: '#687868',
     textOnAccent: '#080e08',
     success: '#52b56b',
     error: '#e05c5c',
@@ -193,8 +193,8 @@ export const themes: Record<ThemeName, ColorScheme> = {
     secondary: '#7de8e0',
     secondarySoft: 'rgba(125, 232, 224, 0.15)',
     textPrimary: '#eeeaf8',
-    textSecondary: '#8890c0',
-    textMuted: '#484e78',
+    textSecondary: '#a0a8d8',
+    textMuted: '#686ea0',
     textOnAccent: '#05060f',
     success: '#5ab88a',
     error: '#e05c6c',
@@ -309,3 +309,48 @@ export const Radius = {
   xl: 24,
   full: 9999,
 };
+
+// Palette of soft, harmonious hues for genre/tag chips (in degrees)
+const GENRE_HUES = [25, 45, 170, 200, 270, 310, 340];
+
+/**
+ * Generate a soft gradient color set for genre/tag chips with consistent brightness.
+ * Uses HSL color space for perceptually uniform lightness.
+ */
+export function getGenreChipColors(name: string): {
+  gradientStart: string;
+  gradientEnd: string;
+  textColor: string;
+  borderColor: string;
+} {
+  // Hash the name to pick a consistent hue
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    hash = hash & hash;
+  }
+
+  // Pick from curated palette for harmonious colors
+  const hueIndex = Math.abs(hash) % GENRE_HUES.length;
+  const baseHue = GENRE_HUES[hueIndex];
+
+  // Add slight variation for gradient (10-20 degrees spread)
+  const hueSpread = 15;
+  const hue1 = baseHue;
+  const hue2 = (baseHue + hueSpread) % 360;
+
+  // Soft, consistent saturation and lightness for all chips
+  const saturation = 55; // Lower saturation = softer colors
+  const lightness1 = 22; // Dark background for contrast
+  const lightness2 = 18; // Slightly darker for gradient end
+
+  // Text color: light enough to read on dark background
+  const textLightness = 88;
+
+  return {
+    gradientStart: `hsl(${hue1}, ${saturation}%, ${lightness1}%)`,
+    gradientEnd: `hsl(${hue2}, ${saturation}%, ${lightness2}%)`,
+    textColor: `hsl(${hue1}, ${saturation - 10}%, ${textLightness}%)`,
+    borderColor: `hsla(${hue1}, ${saturation}%, 40%, 0.3)`,
+  };
+}

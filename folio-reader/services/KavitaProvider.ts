@@ -113,15 +113,28 @@ export class KavitaProvider implements LibraryProvider {
     // because Kavita's update endpoint expects a full SeriesMetadata object
     if (!metadata.id) return;
     const seriesId = Number(metadata.id);
-    const existing = await kavitaAPI.getSeriesMetadata(seriesId);
-    if (!existing) return;
+    const [existing, seriesDetail] = await Promise.all([
+      kavitaAPI.getSeriesMetadata(seriesId),
+      kavitaAPI.getSeriesDetail(seriesId)
+    ]);
+    if (!existing || !seriesDetail) return;
 
+    // 1. Update series name if changed
+    if (metadata.name && metadata.name !== seriesDetail.name) {
+      await kavitaAPI.updateSeries({ id: seriesId, name: metadata.name, localizedName: metadata.localizedName || metadata.name });
+    }
+
+    // 2. Update metadata (summary, genres, tags, writers)
     const updated = {
       ...existing,
       summary: metadata.summary ?? existing.summary,
       // Map genres/tags if they were provided
       genres: metadata.genres ? metadata.genres.map(g => ({ id: Number(g.id), title: g.title })) : existing.genres,
       tags: metadata.tags ? metadata.tags.map(t => ({ id: Number(t.id), title: t.title })) : existing.tags,
+      // Update writers (author) if provided
+      writers: metadata.authorName !== undefined
+        ? metadata.authorName.split(',').map(name => ({ id: 0, name: name.trim() })).filter(w => w.name)
+        : existing.writers,
     };
 
     await kavitaAPI.updateSeriesMetadata(updated);

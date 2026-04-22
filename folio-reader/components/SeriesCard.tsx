@@ -76,11 +76,12 @@ export function SeriesCard({ series, onPress, onContextMenu, style, cardWidth }:
   return (
     <TouchableOpacity
       ref={containerRef}
-      style={[cardWidth ? { width: cardWidth } : styles.cardFallback, style]}
+      style={[cardWidth ? { width: cardWidth } : styles.cardFallback, style, Platform.OS === 'web' && (styles as any).webHover]}
       onPress={onPress}
       onLongPress={onContextMenu ? handleLongPress : undefined}
       delayLongPress={400}
       activeOpacity={0.8}
+      {...(Platform.OS === 'web' ? { className: 'series-card-hover' } : {})}
     >
       <View style={[styles.coverContainer, { backgroundColor: Platform.OS === 'web' ? 'rgba(12, 14, 28, 0.4)' : colors.surface, backdropFilter: Platform.OS === 'web' ? 'blur(8px)' : undefined } as any]}>
         <Image
@@ -244,4 +245,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full, overflow: 'hidden',
   },
   progressText: { fontSize: Typography.xs, color: Colors.textSecondary },
+  // Web hover effect - applied via className
+  webHover: {} as any,
 });

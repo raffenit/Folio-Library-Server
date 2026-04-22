@@ -580,26 +580,23 @@ class AudiobookshelfAPI {
   }
 
   async updateCoverUrl(itemId: string, coverUrl: string): Promise<void> {
-    // Try modern /cover endpoint first
-    try {
-      const url = `/api/items/${itemId}/cover`;
-      await this.client.post(url, { url: coverUrl });
-      return;
-    } catch (e: any) {
-      const status = e?.response?.status;
-      if (status !== 404 && status !== 405) {
-        throw new Error(`Failed to update cover: ${e?.response?.data || e?.message}`);
-      }
-      console.warn(`[ABS] POST /cover returned ${status}, trying legacy /thumbnail...`);
-    }
+    // Use proxy to download image client-side and upload via multipart/form-data
+    // This avoids ABS trying to fetch external URLs server-side (which often fails)
+    const response = await fetch('/abs-cover-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        itemId,
+        imageUrl: coverUrl,
+        absUrl: this.serverUrl,
+        token: this.apiKey,
+      }),
+    });
 
-    // Fallback for older ABS versions
-    try {
-      const legacyUrl = `/api/items/${itemId}/thumbnail`;
-      await this.client.post(legacyUrl, { url: coverUrl });
-    } catch (e: any) {
-      const msg = e?.response?.data || e?.message;
-      throw new Error(`Failed to update cover: ${msg}`);
+    const json = await response.json().catch(() => ({ ok: response.status === 200, status: response.status, error: `HTTP ${response.status}` }));
+    if (!json.ok) {
+      const detail = json.body ? `ABS ${json.status}: ${json.body}` : (json.error ?? `Upload failed (${response.status})`);
+      throw new Error(detail);
     }
   }
 

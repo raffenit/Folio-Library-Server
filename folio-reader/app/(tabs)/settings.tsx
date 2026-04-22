@@ -150,16 +150,34 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
     setTesting(true);
     setStatus('Testing connection...');
     try {
+      console.log('[KavitaModal] Starting save and test...');
       await kavitaAPI.saveCredentials(url.trim(), key.trim());
-      // Authenticate to get JWT token
-      await kavitaAPI.login();
+      console.log('[KavitaModal] Credentials saved, attempting login...');
+      
+      // Authenticate to get JWT token (or validate API key for older Kavita versions)
+      const loginSuccess = await kavitaAPI.login();
+      console.log('[KavitaModal] Login result:', loginSuccess);
+      
+      if (!loginSuccess) {
+        setStatusOk(false);
+        setStatus('Login failed — check your API key.');
+        return;
+      }
+      
+      setStatus('Fetching libraries...');
       // Test the connection by fetching libraries (like ABS does)
       const libraries = await kavitaAPI.getLibraries();
-      console.log('[KavitaModal] Libraries response:', libraries);
+      console.log('[KavitaModal] Libraries response:', libraries, 'type:', typeof libraries, 'isArray:', Array.isArray(libraries));
+      
+      if (libraries === undefined || libraries === null) {
+        setStatusOk(false);
+        setStatus('Invalid response from server (empty). Check API key permissions.');
+        return;
+      }
       
       if (!Array.isArray(libraries)) {
         setStatusOk(false);
-        setStatus('Invalid response from server. Check API key permissions.');
+        setStatus(`Invalid response format from server (${typeof libraries}). Check API key permissions.`);
         return;
       }
       
@@ -174,7 +192,7 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
       setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}.`);
       setTimeout(() => { onSuccess?.(); onClose(); }, 800);
     } catch (e: any) {
-      console.error('[KavitaModal] Connection error:', e?.response?.status, e?.message);
+      console.error('[KavitaModal] Connection error:', e?.response?.status, e?.message, e);
       setStatusOk(false);
       const status = e?.response?.status;
       if (status === 401) {
@@ -1054,6 +1072,7 @@ export default function SettingsScreen() {
       backdropFilter: Platform.OS === 'web' ? 'blur(4px)' : undefined,
     } as any}>
       <TabHeader title="Settings" />
+      <View style={{ height: Spacing.md }} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
         {/* Profile Section - Near Top */}
         <ProfileSection />
@@ -1534,12 +1553,19 @@ export default function SettingsScreen() {
 
 function makeStyles(colors: ColorScheme) {
   return {
-    container: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, backgroundColor: Platform.OS === 'web' ? 'transparent' : colors.background },
     content: { paddingBottom: 60 },
     section: { paddingHorizontal: Spacing.base, marginBottom: Spacing.xl },
     sectionTitle: { fontSize: Typography.sm, fontWeight: Typography.semibold as any, color: colors.textSecondary, textTransform: 'uppercase' as any, letterSpacing: 0.8, marginBottom: Spacing.sm },
     sectionNote: { fontSize: Typography.xs, color: colors.textMuted, lineHeight: 17, marginBottom: Spacing.sm },
-    card: { backgroundColor: colors.surface, borderRadius: Radius.md, overflow: 'hidden' as any, borderWidth: 1, borderColor: colors.border },
+    card: {
+      backgroundColor: Platform.OS === 'web' ? `${colors.surface}80` : colors.surface,
+      borderRadius: Radius.md,
+      overflow: 'hidden' as any,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backdropFilter: Platform.OS === 'web' ? 'blur(12px)' : undefined,
+    },
     divider: { height: 1, backgroundColor: colors.border, marginLeft: Spacing.base + 34 + Spacing.md },
     footer: { fontSize: Typography.xs, color: colors.textMuted, textAlign: 'center' as any, paddingHorizontal: Spacing.xl, marginTop: Spacing.xl, lineHeight: 18 },
   };

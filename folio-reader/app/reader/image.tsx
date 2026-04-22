@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,6 +14,14 @@ import { kavitaAPI, ChapterInfo } from '../../services/kavitaAPI';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Typography, Spacing, Radius, ColorScheme } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { storage } from '../../services/storage';
+
+// Storage keys for reader preferences
+const STORAGE_KEY_READING_DIRECTION = 'folio_comic_reading_direction';
+const STORAGE_KEY_FIT_MODE = 'folio_comic_fit_mode';
+
+type ReadingDirection = 'ltr' | 'rtl';
+type FitMode = 'contain' | 'width' | 'height';
 
 export default function ImageReaderScreen() {
   const { colors } = useTheme();
@@ -24,14 +33,27 @@ export default function ImageReaderScreen() {
     title: string;
     seriesId: string;
     volumeId: string;
-    libraryId: string; // Add this
+    libraryId: string;
   }>();
 
   const [showHeader, setShowHeader] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [readingDirection, setReadingDirection] = useState<ReadingDirection>('ltr');
+  const [fitMode, setFitMode] = useState<FitMode>('contain');
   const webViewRef = useRef<WebView>(null);
+
+  // Load saved preferences
+  useEffect(() => {
+    storage.getItem(STORAGE_KEY_READING_DIRECTION).then((val) => {
+      if (val === 'rtl' || val === 'ltr') setReadingDirection(val);
+    });
+    storage.getItem(STORAGE_KEY_FIT_MODE).then((val) => {
+      if (val === 'contain' || val === 'width' || val === 'height') setFitMode(val);
+    });
+  }, []);
 
   // Convert to numbers for the API calls
   const chapterId = Number(params.chapterId);
@@ -54,6 +76,7 @@ export default function ImageReaderScreen() {
   // In proxy mode serverUrl is '' so these become relative URLs, proxied to Kavita
   const serverUrl = kavitaAPI.getServerUrl();
 
+  // Build the HTML template with current settings
   const imageHtml = `
 <!DOCTYPE html>
 <html>
@@ -77,10 +100,35 @@ export default function ImageReaderScreen() {
       overflow: hidden;
     }
     #page-img {
+      display: none;
+      ${fitMode === 'contain' ? `
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
-      display: none;
+      ` : fitMode === 'width' ? `
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+      ` : `
+      width: auto;
+      height: 100%;
+      object-fit: contain;
+      `}
+    }
+    #page-img.fit-contain {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    #page-img.fit-width {
+      width: 100%;
+      height: auto;
+      object-fit: contain;
+    }
+    #page-img.fit-height {
+      width: auto;
+      height: 100%;
+      object-fit: contain;
     }
     #spinner {
       color: ${colors.accent};
@@ -174,6 +222,10 @@ export default function ImageReaderScreen() {
       }
     }
 
+    // Reading direction: 'ltr' (Western comics) or 'rtl' (Manga)
+    const READING_DIRECTION = '${readingDirection}';
+    const isRTL = READING_DIRECTION === 'rtl';
+
     // Touch swipe navigation
     let touchStartX = 0, touchStartY = 0;
     document.addEventListener('touchstart', e => {
@@ -184,9 +236,16 @@ export default function ImageReaderScreen() {
       const dx = e.changedTouches[0].clientX - touchStartX;
       const dy = e.changedTouches[0].clientY - touchStartY;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-        // horizontal swipe — manga reads right-to-left by default
-        if (dx < 0) showPage(currentPage + 1);
-        else showPage(currentPage - 1);
+        // horizontal swipe — respect reading direction
+        // RTL (manga): swipe left = next page, swipe right = prev page
+        // LTR (western): swipe left = prev page, swipe right = next page
+        if (isRTL) {
+          if (dx < 0) showPage(currentPage + 1);
+          else showPage(currentPage - 1);
+        } else {
+          if (dx < 0) showPage(currentPage - 1);
+          else showPage(currentPage + 1);
+        }
       } else if (Math.abs(dx) < 8 && Math.abs(dy) < 8) {
         // tap — toggle header
         notify({ type: 'tap' });
@@ -195,17 +254,28 @@ export default function ImageReaderScreen() {
 
     // Click left/right zone navigation
     document.getElementById('viewer').addEventListener('click', e => {
-      // Don't handle clicks that originated from a swipe
       const x = e.clientX / window.innerWidth;
-      if (x < 0.25) showPage(currentPage - 1);
-      else if (x > 0.75) showPage(currentPage + 1);
-      else notify({ type: 'tap' });
+      if (isRTL) {
+        // RTL: left edge = next, right edge = prev
+        if (x < 0.25) showPage(currentPage + 1);
+        else if (x > 0.75) showPage(currentPage - 1);
+        else notify({ type: 'tap' });
+      } else {
+        // LTR: left edge = prev, right edge = next
+        if (x < 0.25) showPage(currentPage - 1);
+        else if (x > 0.75) showPage(currentPage + 1);
+        else notify({ type: 'tap' });
+      }
     });
 
     // Exposed to React Native
-    window.goNext = () => showPage(currentPage + 1);
-    window.goPrev = () => showPage(currentPage - 1);
+    window.goNext = () => showPage(currentPage + (isRTL ? 1 : -1));
+    window.goPrev = () => showPage(currentPage + (isRTL ? -1 : 1));
     window.goToPage = (n) => showPage(n);
+    window.setFitMode = (mode) => {
+      const img = document.getElementById('page-img');
+      img.className = 'fit-' + mode;
+    };
 
     init();
   </script>
@@ -255,11 +325,84 @@ export default function ImageReaderScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {params.title || 'Reader'}
           </Text>
-          {totalPages > 0 && (
-            <Text style={styles.pageCount}>
-              {currentPage + 1} / {totalPages}
-            </Text>
-          )}
+          <TouchableOpacity style={styles.headerBtn} onPress={() => setShowSettings(v => !v)}>
+            <Ionicons name="settings-outline" size={22} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <View style={styles.settingsPanel}>
+          <View style={styles.settingsContent}>
+            <Text style={styles.settingsTitle}>Reading Settings</Text>
+
+            {/* Reading Direction */}
+            <View style={styles.settingRow}>
+              <Text style={styles.settingLabel}>Reading Direction</Text>
+              <View style={styles.settingButtons}>
+                <TouchableOpacity
+                  style={[styles.settingBtn, readingDirection === 'ltr' && styles.settingBtnActive]}
+                  onPress={() => {
+                    setReadingDirection('ltr');
+                    storage.setItem(STORAGE_KEY_READING_DIRECTION, 'ltr');
+                  }}
+                >
+                  <Text style={[styles.settingBtnText, readingDirection === 'ltr' && styles.settingBtnTextActive]}>LTR</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.settingBtn, readingDirection === 'rtl' && styles.settingBtnActive]}
+                  onPress={() => {
+                    setReadingDirection('rtl');
+                    storage.setItem(STORAGE_KEY_READING_DIRECTION, 'rtl');
+                  }}
+                >
+                  <Text style={[styles.settingBtnText, readingDirection === 'rtl' && styles.settingBtnTextActive]}>RTL</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Fit Mode */}
+            <View style={styles.settingRow}>
+              <Text style={styles.settingLabel}>Fit Mode</Text>
+              <View style={styles.settingButtons}>
+                <TouchableOpacity
+                  style={[styles.settingBtn, fitMode === 'contain' && styles.settingBtnActive]}
+                  onPress={() => {
+                    setFitMode('contain');
+                    storage.setItem(STORAGE_KEY_FIT_MODE, 'contain');
+                    sendCmd("window.setFitMode('contain')");
+                  }}
+                >
+                  <Text style={[styles.settingBtnText, fitMode === 'contain' && styles.settingBtnTextActive]}>Fit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.settingBtn, fitMode === 'width' && styles.settingBtnActive]}
+                  onPress={() => {
+                    setFitMode('width');
+                    storage.setItem(STORAGE_KEY_FIT_MODE, 'width');
+                    sendCmd("window.setFitMode('width')");
+                  }}
+                >
+                  <Text style={[styles.settingBtnText, fitMode === 'width' && styles.settingBtnTextActive]}>Width</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.settingBtn, fitMode === 'height' && styles.settingBtnActive]}
+                  onPress={() => {
+                    setFitMode('height');
+                    storage.setItem(STORAGE_KEY_FIT_MODE, 'height');
+                    sendCmd("window.setFitMode('height')");
+                  }}
+                >
+                  <Text style={[styles.settingBtnText, fitMode === 'height' && styles.settingBtnTextActive]}>Height</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.closeSettingsBtn} onPress={() => setShowSettings(false)}>
+              <Text style={styles.closeSettingsText}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -375,4 +518,77 @@ const makeStyles = (colors: ColorScheme) => StyleSheet.create({
     gap: Spacing.md,
   },
   loadingText: { fontSize: Typography.base, color: colors.textSecondary },
+  // Settings Panel Styles
+  settingsPanel: {
+    position: 'absolute',
+    top: 0, bottom: 0, left: 0, right: 0,
+    zIndex: 30,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  settingsContent: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    width: '100%',
+    maxWidth: 360,
+    gap: Spacing.lg,
+  },
+  settingsTitle: {
+    fontSize: Typography.lg,
+    fontWeight: Typography.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  settingRow: {
+    gap: Spacing.sm,
+  },
+  settingLabel: {
+    fontSize: Typography.sm,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    fontWeight: Typography.semibold,
+  },
+  settingButtons: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  settingBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  settingBtnActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  settingBtnText: {
+    fontSize: Typography.sm,
+    color: colors.textSecondary,
+    fontWeight: Typography.medium,
+  },
+  settingBtnTextActive: {
+    color: colors.textOnAccent,
+    fontWeight: Typography.bold,
+  },
+  closeSettingsBtn: {
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+  },
+  closeSettingsText: {
+    fontSize: Typography.base,
+    color: colors.textPrimary,
+    fontWeight: Typography.semibold,
+  },
 });

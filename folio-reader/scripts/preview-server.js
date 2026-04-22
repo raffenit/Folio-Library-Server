@@ -259,6 +259,134 @@ function handleOpenLibraryProxy(req, res, targetUrl, redirectCount = 0) {
   });
 }
 
+// POST /abs-cover-proxy — fetch image server-side, upload to Audiobookshelf via multipart
+function handleABSCoverProxy(req, res) {
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', async () => {
+    try {
+      const { itemId, imageUrl, absUrl, token } = JSON.parse(body);
+      console.log(`[abs-cover-proxy] itemId=${itemId} absUrl=${absUrl} imageUrl=${imageUrl?.substring(0, 80)}...`);
+
+      if (!absUrl) {
+        throw new Error('Missing absUrl parameter');
+      }
+
+      // Fetch the image as binary (or extract from data URL)
+      let imageBuffer;
+      let contentType = 'image/jpeg';
+      let extension = 'jpg';
+
+      if (imageUrl.startsWith('data:')) {
+        // Handle data URL (base64 encoded image)
+        const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) {
+          throw new Error('Invalid data URL format');
+        }
+        contentType = match[1] || 'image/jpeg';
+        // Extract extension from content type
+        const ctLower = contentType.toLowerCase();
+        if (ctLower.includes('webp')) extension = 'webp';
+        else if (ctLower.includes('png')) extension = 'png';
+        else if (ctLower.includes('gif')) extension = 'gif';
+        else if (ctLower.includes('bmp')) extension = 'bmp';
+        const base64Data = match[2];
+        imageBuffer = Buffer.from(base64Data, 'base64');
+        console.log(`[abs-cover-proxy] extracted from data URL: ${Math.round(imageBuffer.length / 1024)} KB, type: ${contentType}, ext: ${extension}`);
+      } else {
+        // Fetch HTTP(S) URL
+        imageBuffer = await fetchImageBuffer(imageUrl);
+        console.log(`[abs-cover-proxy] fetched image: ${Math.round(imageBuffer.length / 1024)} KB`);
+
+        // Detect content type from URL or default to jpeg
+        const urlLower = imageUrl.toLowerCase();
+        if (urlLower.endsWith('.webp')) { contentType = 'image/webp'; extension = 'webp'; }
+        else if (urlLower.endsWith('.png')) { contentType = 'image/png'; extension = 'png'; }
+        else if (urlLower.endsWith('.gif')) { contentType = 'image/gif'; extension = 'gif'; }
+        else if (urlLower.endsWith('.bmp')) { contentType = 'image/bmp'; extension = 'bmp'; }
+      }
+
+      // Build multipart/form-data payload
+      const boundary = '----FolioFormBoundary' + Math.random().toString(36).substring(2);
+      const preAmble = Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="file"; filename="cover.${extension}"\r\n` +
+        `Content-Type: ${contentType}\r\n\r\n`
+      );
+      const postAmble = Buffer.from(`\r\n--${boundary}--\r\n`);
+      const payload = Buffer.concat([preAmble, imageBuffer, postAmble]);
+
+      const absTarget = new URL(absUrl.replace(/\/$/, ''));
+      const options = {
+        hostname: absTarget.hostname,
+        port: Number(absTarget.port) || (absTarget.protocol === 'https:' ? 443 : 80),
+        path: `/api/items/${itemId}/cover`,
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Length': payload.length,
+        },
+      };
+
+      const transport = absTarget.protocol === 'https:' ? https : http;
+      const proxyReq = transport.request(options, (proxyRes) => {
+        let respBody = '';
+        proxyRes.on('data', c => { respBody += c; });
+        proxyRes.on('end', () => {
+          console.log(`[abs-cover-proxy] ABS responded: ${proxyRes.statusCode} — ${respBody.substring(0, 200)}`);
+          const ok = proxyRes.statusCode >= 200 && proxyRes.statusCode < 300;
+          res.writeHead(ok ? 200 : proxyRes.statusCode, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            status: proxyRes.statusCode,
+            ok,
+            body: respBody,
+          }));
+        });
+      });
+
+      proxyReq.on('error', (err) => {
+        console.error('[abs-cover-proxy] request error:', err.message);
+        res.writeHead(502);
+        res.end(JSON.stringify({ error: err.message }));
+      });
+
+      proxyReq.write(payload);
+      proxyReq.end();
+    } catch (e) {
+      console.error('[abs-cover-proxy] exception:', e.message, e.stack);
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: e.message, stack: e.stack }));
+    }
+  });
+}
+
+// Helper to fetch image as binary buffer
+function fetchImageBuffer(imageUrl, redirectCount = 0) {
+  if (redirectCount > 5) return Promise.reject(new Error('Too many redirects'));
+  return new Promise((resolve, reject) => {
+    const mod = imageUrl.startsWith('https') ? https : http;
+    const req = mod.get(imageUrl, { headers: { 'User-Agent': 'Folio/1.0' } }, (res) => {
+      // Follow redirects
+      if ((res.statusCode === 301 || res.statusCode === 302 || res.statusCode === 307 || res.statusCode === 308) && res.headers.location) {
+        res.resume();
+        resolve(fetchImageBuffer(res.headers.location, redirectCount + 1));
+        return;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        reject(new Error(`Image fetch returned ${res.statusCode}`));
+        return;
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+  });
+}
+
 function dynamicProxy(req, res) {
   console.log(`[dynamic-proxy] Received request: ${req.url}`);
   const parsedUrl = new URL(req.url, `http://localhost:${PORT}`);
@@ -347,6 +475,9 @@ const server = http.createServer((req, res) => {
   } else if (req.url === '/cover-proxy' && req.method === 'POST') {
     console.log('[server] Routing to cover-proxy');
     handleCoverProxy(req, res);
+  } else if (req.url === '/abs-cover-proxy' && req.method === 'POST') {
+    console.log('[server] Routing to abs-cover-proxy');
+    handleABSCoverProxy(req, res);
   } else if (req.url.startsWith('/openlibrary-proxy')) {
     console.log('[server] Routing to openlibrary-proxy');
     handleOpenLibraryProxy(req, res, null);

@@ -341,13 +341,6 @@ class KavitaAPI {
     this.setServer(serverUrl, apiKey);
     await storage.setItem(STORAGE_KEYS.SERVER_URL, this.serverUrl);
     await storage.setItem(STORAGE_KEYS.API_KEY, apiKey);
-    this.apiKey = apiKey;
-
-    let cleanUrl = serverUrl.trim().replace(/\/$/, '');
-    if (!/^https?:\/\//i.test(cleanUrl)) cleanUrl = 'http://' + cleanUrl;
-    this.serverUrl = cleanUrl;
-    this.client.defaults.baseURL = cleanUrl;
-    await storage.setItem(STORAGE_KEYS.SERVER_URL, cleanUrl);
   }
 
   async loadCredentials() {
@@ -445,7 +438,12 @@ class KavitaAPI {
   // ── Libraries ───────────────────────────────────────────────────────────────
 
   async getLibraries(): Promise<Library[]> {
+    console.log('[KavitaAPI] getLibraries() - jwtToken:', !!this.jwtToken, 'apiKey:', !!this.apiKey, 'proxy:', !!this.proxyOrigin);
     const response = await this.client.get('/api/Library');
+    console.log('[KavitaAPI] getLibraries() response status:', response.status, 'data type:', typeof response.data, 'isArray:', Array.isArray(response.data));
+    if (__DEV__ && response.data) {
+      console.log('[KavitaAPI] getLibraries() response data:', JSON.stringify(response.data).substring(0, 500));
+    }
     return response.data;
   }
 

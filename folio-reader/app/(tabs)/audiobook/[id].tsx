@@ -12,10 +12,11 @@ import { LibraryFactory } from '@/services/LibraryFactory';
 import { LibrarySeriesDetail } from '@/services/LibraryProvider';
 import { useAudioPlayer } from '@/contexts/AudioPlayerContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Typography, Spacing, Radius } from '@/constants/theme';
+import { Typography, Spacing, Radius, getGenreChipColors } from '@/constants/theme';
 import { EditMetadataModal } from '@/components/modals/EditMetadataModal';
 import { CoverPickerModal } from '@/components/modals/CoverPickerModal';
 import { MetadataSearchModal } from '@/components/modals/MetadataSearchModal';
+import { MarkdownText } from '@/components/MarkdownText';
 import { startReadingSession, endReadingSession } from '@/services/stats';
 
 import Slider from '@react-native-community/slider';
@@ -564,23 +565,39 @@ export default function AudiobookPlayerScreen() {
               {/* Genres + tags chips */}
               {(displayGenres.length > 0 || displayTags.length > 0) && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 4 }}>
-                  {displayGenres.map((g: any) => (
-                    <View key={g.id || g.title} style={styles.metaChip}>
-                      <Text style={styles.metaChipText}>{g.title || g}</Text>
-                    </View>
-                  ))}
-                  {displayTags.map((t: any) => (
-                    <View key={t.id || t.title} style={[styles.metaChip, styles.metaChipTag]}>
-                      <Text style={[styles.metaChipText, styles.metaChipTagText]}>{t.title || t}</Text>
-                    </View>
-                  ))}
+                  {displayGenres.map((g: any) => {
+                    const chipColors = getGenreChipColors(g.title || g);
+                    return (
+                      <View key={g.id || g.title} style={[styles.metaChip, {
+                        backgroundColor: chipColors.gradientStart,
+                        borderColor: chipColors.borderColor,
+                      }]}>
+                        <Text style={[styles.metaChipText, { color: chipColors.textColor }]}>{g.title || g}</Text>
+                      </View>
+                    );
+                  })}
+                  {displayTags.map((t: any) => {
+                    const chipColors = getGenreChipColors(t.title || t);
+                    return (
+                      <View key={t.id || t.title} style={[styles.metaChip, {
+                        backgroundColor: chipColors.gradientEnd,
+                        borderColor: chipColors.borderColor,
+                      }]}>
+                        <Text style={[styles.metaChipText, { color: chipColors.textColor }]}>{t.title || t}</Text>
+                      </View>
+                    );
+                  })}
                 </ScrollView>
               )}
 
               {/* Description */}
               {displaySummary ? (
                 <TouchableOpacity onPress={() => setDescExpanded(v => !v)} activeOpacity={0.8}>
-                  <Text style={styles.desc} numberOfLines={descExpanded ? undefined : 4}>{displaySummary}</Text>
+                  {descExpanded ? (
+                    <MarkdownText content={displaySummary} />
+                  ) : (
+                    <Text style={styles.desc} numberOfLines={4}>{displaySummary}</Text>
+                  )}
                   <Text style={styles.descToggle}>{descExpanded ? 'Show less' : 'Read more'}</Text>
                 </TouchableOpacity>
               ) : (
@@ -1287,24 +1304,14 @@ const makeStyles = (colors: ColorScheme, isWide = false) => StyleSheet.create({
     padding: 4,
   },
   metaChip: {
-    backgroundColor: colors.surface,
     borderRadius: Radius.full,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     marginRight: Spacing.xs,
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  metaChipTag: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent + '44',
   },
   metaChipText: {
     fontSize: Typography.xs,
-    color: colors.textSecondary,
-  },
-  metaChipTagText: {
-    color: colors.accent,
   },
   desc: {
     fontSize: Typography.sm,

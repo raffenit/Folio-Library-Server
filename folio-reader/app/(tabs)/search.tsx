@@ -77,17 +77,21 @@ export default function SearchScreen() {
 
   return (
     <View style={[styles.container, {
-      backgroundColor: Platform.OS === 'web' ? 'rgba(5, 6, 15, 0.65)' : colors.background,
-      backdropFilter: Platform.OS === 'web' ? 'blur(12px) saturate(150%)' : undefined,
+      backgroundColor: Platform.OS === 'web' ? 'rgba(5, 6, 15, 0.15)' : colors.background,
     } as any]}>
       <TabHeader 
         title="Search" 
         count={searched ? results.length : undefined} 
         countLabel="results" 
       />
+      <View style={{ height: Spacing.md }} />
       
       <View style={styles.searchSection}>
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.searchBar, {
+          backgroundColor: Platform.OS === 'web' ? `${colors.surface}80` : colors.surface,
+          borderColor: colors.border,
+          backdropFilter: Platform.OS === 'web' ? 'blur(12px)' : undefined,
+        } as any]}>
           <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
             style={[styles.input, { color: colors.textPrimary }]}

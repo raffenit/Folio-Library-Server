@@ -105,8 +105,8 @@ function generateNebula(count: number, accent: string, secondary: string, backgr
   };
   return Array.from({ length: count }, (_, i) => ({
     id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
+    x: 25 + Math.random() * 50,
+    y: 25 + Math.random() * 50,
     size: Math.random() * 60 + 30,
     color: colors[i % colors.length],
     duration: Math.random() * 25 + 20,
@@ -116,7 +116,7 @@ function generateNebula(count: number, accent: string, secondary: string, backgr
 }
 
 // Pre-generate static initial stars to avoid calculation delay
-const STATIC_STARS = Array.from({ length: 50 }, (_, i) => ({
+const STATIC_STARS = Array.from({ length: 200 }, (_, i) => ({
   id: i,
   x: Math.random() * 100,
   y: Math.random() * 100,
@@ -129,8 +129,10 @@ const STATIC_STARS = Array.from({ length: 50 }, (_, i) => ({
 const STARFIELD_STYLES = {
   container: {
     position: 'fixed' as const,
-    inset: 0,
-    overflow: 'hidden',
+    top: '-50vh',
+    left: '-50vw',
+    width: '200vw',
+    height: '200vh',
     zIndex: 0,
     pointerEvents: 'none' as const,
     transform: 'translateZ(0)',
@@ -139,7 +141,7 @@ const STARFIELD_STYLES = {
   nebula: {
     position: 'absolute' as const,
     borderRadius: '60% 40% 70% 30% / 40% 50% 60% 50%',
-    filter: 'blur(60px)',
+    filter: 'blur(30px)',
     pointerEvents: 'none' as const,
     transform: 'translateZ(0)',
   },
@@ -170,7 +172,7 @@ export function StarfieldBackground() {
   
   const stars = useMemo(() => {
     if (!starsReady) return STATIC_STARS;
-    return generateStars(60, {
+    return generateStars(240, {
       accent: colors.accent,
       surface: colors.surface,
       textMuted: colors.textMuted,
@@ -224,6 +226,11 @@ export function StarfieldBackground() {
         0%, 100% { opacity: 0.4; } 
         50% { opacity: 0.9; } 
       }
+      @keyframes starfield-rotate { 
+        0% { transform: rotate(0deg) scale(1.5); }
+        50% { transform: rotate(180deg) scale(1.5); }
+        100% { transform: rotate(360deg) scale(1.5); }
+      }
     `;
     
     const styleEl = document.createElement('style');
@@ -243,7 +250,13 @@ export function StarfieldBackground() {
   }
 
   return (
-    <div style={STARFIELD_STYLES.container}>
+    <div style={{
+      ...STARFIELD_STYLES.container,
+      animation: (uiAnimationsEnabled && animationsReady)
+        ? 'starfield-rotate 720s linear infinite'
+        : undefined,
+      transformOrigin: 'center center',
+    }}>
       {/* Reduced nebula count for faster render */}
       {nebulaClouds.slice(0, 5).map((cloud) => (
         <div

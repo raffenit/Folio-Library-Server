@@ -8,6 +8,39 @@ import { useSharedValue } from 'react-native-reanimated';
 // Visible tabs in order for swipe navigation
 const VISIBLE_TABS = ['index', 'audiobooks', 'search', 'profile', 'settings'];
 
+// Custom translucent tab bar background for web
+function TranslucentTabBarBackground() {
+  const { colors } = useTheme();
+  if (Platform.OS === 'web') {
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: colors.surface + 'E6',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      />
+    );
+  }
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: colors.surface + 'DD',
+      }}
+    />
+  );
+}
+
 function SwipeableTabs({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -27,10 +60,12 @@ function SwipeableTabs({ children }: { children: React.ReactNode }) {
         const velocity = e.velocityX;
         const translation = e.translationX;
 
-        // Get current tab from pathname
-        const currentTab = pathname?.split('/').pop() || 'index';
+        // Get current tab from pathname - only for visible tabs, ignore nested routes
+        const pathParts = pathname?.split('/').filter(Boolean) || [];
+        const currentTab = pathParts[1] || 'index';
         const currentIndex = VISIBLE_TABS.indexOf(currentTab);
 
+        // Only handle swipe for visible tabs, ignore nested routes like series/[id]
         if (currentIndex === -1) return;
 
         // Swipe left (negative translation) -> go to next tab (right)
@@ -82,6 +117,7 @@ export default function TabsLayout() {
           bottom: 0,
           elevation: 0,
         },
+        tabBarBackground: () => <TranslucentTabBarBackground />,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {
@@ -139,10 +175,13 @@ export default function TabsLayout() {
         }}
       />
       {/* Hidden tabs — files kept for router compatibility */}
+      <Tabs.Screen name="ebooks" options={{ href: null }} />
       <Tabs.Screen name="libraries" options={{ href: null }} />
       <Tabs.Screen name="collections" options={{ href: null }} />
       <Tabs.Screen name="browse" options={{ href: null }} />
+      <Tabs.Screen name="audiobook" options={{ href: null }} />
       <Tabs.Screen name="audiobook/[id]" options={{ href: null }} />
+      <Tabs.Screen name="series" options={{ href: null }} />
       <Tabs.Screen name="series/[id]" options={{ href: null }} />
     </Tabs>
     </SwipeableTabs>

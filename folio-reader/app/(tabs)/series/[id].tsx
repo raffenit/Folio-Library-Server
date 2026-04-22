@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
   Platform,
   useWindowDimensions,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Typography, Spacing, Radius, type ColorScheme } from '@/constants/theme';
+import { Typography, Spacing, Radius, type ColorScheme, getGenreChipColors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 // Hooks & Services
@@ -106,6 +108,13 @@ export default function SeriesDetailScreen() {
   const [tocLoading, setTocLoading] = useState(false);
   const { play } = useAudioPlayer();
 
+  // Inline editing state
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingAuthor, setEditingAuthor] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState('');
+  const [editAuthorValue, setEditAuthorValue] = useState('');
+  const [saving, setSaving] = useState(false);
+
   const chapters = useMemo(() => (detail?.volumes ? flatChapters(detail.volumes) : []), [detail]);
 
   // For single-chapter EPUBs, fetch TOC to show actual chapters
@@ -195,8 +204,16 @@ export default function SeriesDetailScreen() {
       title: displayName,
     };
 
-    // Route to correct reader based on format: 4 = PDF
-    const pathname = chapter.format === 4 ? '/reader/pdf' : '/reader/epub';
+    // Route to correct reader based on format:
+    // 1 = Archive/CBZ/CBR, 3 = EPUB, 4 = PDF
+    let pathname: string;
+    if (chapter.format === 4) {
+      pathname = '/reader/pdf';
+    } else if (chapter.format === 1) {
+      pathname = '/reader/image';
+    } else {
+      pathname = '/reader/epub';
+    }
     router.push({ pathname, params: navParams });
   }
 
@@ -257,8 +274,143 @@ export default function SeriesDetailScreen() {
 
           {/* Metadata & Description Section */}
           <View style={[styles.metaBlock, isLargeScreen && styles.metaBlockLarge]}>
-            <Text style={styles.seriesTitle}>{displayName}</Text>
-            <Text style={styles.authorText}>{authors || 'No author'}</Text>
+            {/* Inline Editable Title */}
+            {editingTitle ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <TextInput
+                  style={[styles.seriesTitle, { flex: 1, backgroundColor: colors.surface, borderRadius: Radius.md, paddingHorizontal: Spacing.sm }]} 
+                  value={editTitleValue}
+                  onChangeText={setEditTitleValue}
+                  autoFocus
+                  onBlur={() => setEditingTitle(false)}
+                  onSubmitEditing={async () => {
+                    if (!detail || editTitleValue.trim() === displayName) {
+                      setEditingTitle(false);
+                      return;
+                    }
+                    setSaving(true);
+                    try {
+                      await provider.updateSeriesMetadata({
+                        id: detail.id,
+                        name: editTitleValue.trim(),
+                        localizedName: editTitleValue.trim(),
+                      });
+                      refresh();
+                      setEditingTitle(false);
+                    } catch (e: any) {
+                      Alert.alert('Error', e?.message || 'Failed to update title');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  editable={!saving}
+                />
+                <TouchableOpacity 
+                  onPress={async () => {
+                    if (!detail || editTitleValue.trim() === displayName) {
+                      setEditingTitle(false);
+                      return;
+                    }
+                    setSaving(true);
+                    try {
+                      await provider.updateSeriesMetadata({
+                        id: detail.id,
+                        name: editTitleValue.trim(),
+                        localizedName: editTitleValue.trim(),
+                      });
+                      refresh();
+                      setEditingTitle(false);
+                    } catch (e: any) {
+                      Alert.alert('Error', e?.message || 'Failed to update title');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                >
+                  <Ionicons name="checkmark" size={20} color={colors.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setEditTitleValue(displayName); setEditingTitle(false); }}>
+                  <Ionicons name="close" size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => { setEditTitleValue(displayName); setEditingTitle(true); }} activeOpacity={0.7}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+                  <Text style={styles.seriesTitle}>{displayName}</Text>
+                  <Ionicons name="pencil" size={14} color={colors.textMuted} />
+                </View>
+              </TouchableOpacity>
+            )}
+
+            {/* Inline Editable Author */}
+            {editingAuthor ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs }}>
+                <TextInput
+                  style={[styles.authorText, { flex: 1, backgroundColor: colors.surface, borderRadius: Radius.md, paddingHorizontal: Spacing.sm, color: colors.textPrimary }]} 
+                  value={editAuthorValue}
+                  onChangeText={setEditAuthorValue}
+                  autoFocus
+                  onBlur={() => setEditingAuthor(false)}
+                  onSubmitEditing={async () => {
+                    if (!detail || editAuthorValue.trim() === (authors || '')) {
+                      setEditingAuthor(false);
+                      return;
+                    }
+                    setSaving(true);
+                    try {
+                      await provider.updateSeriesMetadata({
+                        id: detail.id,
+                        authorName: editAuthorValue.trim(),
+                      });
+                      refresh();
+                      setEditingAuthor(false);
+                    } catch (e: any) {
+                      Alert.alert('Error', e?.message || 'Failed to update author');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  editable={!saving}
+                  placeholder="Author name..."
+                  placeholderTextColor={colors.textMuted}
+                />
+                <TouchableOpacity 
+                  onPress={async () => {
+                    if (!detail || editAuthorValue.trim() === (authors || '')) {
+                      setEditingAuthor(false);
+                      return;
+                    }
+                    setSaving(true);
+                    try {
+                      await provider.updateSeriesMetadata({
+                        id: detail.id,
+                        authorName: editAuthorValue.trim(),
+                      });
+                      refresh();
+                      setEditingAuthor(false);
+                    } catch (e: any) {
+                      Alert.alert('Error', e?.message || 'Failed to update author');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                >
+                  <Ionicons name="checkmark" size={18} color={colors.accent} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setEditAuthorValue(authors || ''); setEditingAuthor(false); }}>
+                  <Ionicons name="close" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => { setEditAuthorValue(authors || ''); setEditingAuthor(true); }} activeOpacity={0.7}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+                  <Text style={styles.authorText}>{authors || 'No author'}</Text>
+                  <Ionicons name="pencil" size={12} color={colors.textMuted} />
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* Primary Action Buttons - Moved to top of description column */}
             <View style={styles.readButtonContainer}>
@@ -303,16 +455,28 @@ export default function SeriesDetailScreen() {
             {/* Genres & Tags */}
             {((detail.genres?.length || 0) > 0 || (detail.tags?.length || 0) > 0) && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                {detail.genres?.map((g: any) => (
-                  <View key={`g-${g.id}`} style={styles.metaChip}>
-                    <Text style={styles.metaChipText}>{g.title}</Text>
-                  </View>
-                ))}
-                {detail.tags?.map((t: any) => (
-                  <View key={`t-${t.id}`} style={[styles.metaChip, styles.metaChipTag]}>
-                    <Text style={[styles.metaChipText, styles.metaChipTagText]}>{t.title}</Text>
-                  </View>
-                ))}
+                {detail.genres?.map((g: any) => {
+                  const chipColors = getGenreChipColors(g.title);
+                  return (
+                    <View key={`g-${g.id}`} style={[styles.metaChip, {
+                      backgroundColor: chipColors.gradientStart,
+                      borderColor: chipColors.borderColor,
+                    }]}>
+                      <Text style={[styles.metaChipText, { color: chipColors.textColor }]}>{g.title}</Text>
+                    </View>
+                  );
+                })}
+                {detail.tags?.map((t: any) => {
+                  const chipColors = getGenreChipColors(t.title);
+                  return (
+                    <View key={`t-${t.id}`} style={[styles.metaChip, {
+                      backgroundColor: chipColors.gradientEnd,
+                      borderColor: chipColors.borderColor,
+                    }]}>
+                      <Text style={[styles.metaChipText, { color: chipColors.textColor }]}>{t.title}</Text>
+                    </View>
+                  );
+                })}
               </ScrollView>
             )}
 
@@ -383,40 +547,83 @@ export default function SeriesDetailScreen() {
           ) : chapters.length === 0 ? (
             <Text style={styles.noChapters}>No chapters found.</Text>
           ) : (
-            chapters.map(({ chapter, volume }) => {
-              const chProgress = chapter.pages > 0 ? (chapter.pagesRead / chapter.pages) * 100 : 0;
-              const chLabel = chapter.title || `Chapter ${chapter.number}`;
-              
-              return (
-                <TouchableOpacity
-                  key={chapter.id}
-                  style={styles.chapterRow}
-                  onPress={() => openChapter(chapter, volume)}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.chapterLeft}>
-                    <Text style={styles.chapterNum}>{chLabel}</Text>
-                    <View style={styles.chapterMeta}>
-                      <Text style={styles.chapterPages}>{chapter.pages} pages</Text>
-                    </View>
-                  </View>
-                  <View style={styles.chapterRight}>
-                    {chProgress > 0 && chProgress < 100 ? (
-                      <View style={styles.chapterProgressContainer}>
-                        <View style={styles.chapterProgressTrack}>
-                          <View style={[styles.chapterProgressFill, { width: `${chProgress}%` }]} />
-                        </View>
-                        <Text style={styles.chapterProgressText}>{Math.round(chProgress)}%</Text>
-                      </View>
-                    ) : chProgress >= 100 ? (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                    ) : (
-                      <Ionicons name="play-circle-outline" size={20} color={colors.textMuted} />
-                    )}
-                  </View>
-                </TouchableOpacity>
+            // Group chapters by volume for proper comic book structure
+            (() => {
+              // Group by volume
+              const volumeGroups = new Map<string | number, { volume: LibraryVolume; chapters: typeof chapters }>();
+              chapters.forEach(({ chapter, volume }) => {
+                if (!volumeGroups.has(volume.id)) {
+                  volumeGroups.set(volume.id, { volume, chapters: [] });
+                }
+                volumeGroups.get(volume.id)!.chapters.push({ chapter, volume });
+              });
+
+              // Sort volumes by number
+              const sortedVolumes = Array.from(volumeGroups.values()).sort((a, b) => 
+                Number(a.volume.number) - Number(b.volume.number)
               );
-            })
+
+              return sortedVolumes.map(({ volume, chapters: volumeChapters }) => (
+                <View key={volume.id}>
+                  {/* Volume Header - show if multiple volumes or volume has a name */}
+                  {(sortedVolumes.length > 1 || volume.name) && (
+                    <View style={{ 
+                      backgroundColor: colors.surface, 
+                      paddingVertical: Spacing.sm,
+                      paddingHorizontal: Spacing.md,
+                      marginTop: Spacing.md,
+                      marginBottom: Spacing.xs,
+                      borderRadius: Radius.md,
+                      borderLeftWidth: 3,
+                      borderLeftColor: colors.accent,
+                    }}>
+                      <Text style={{ 
+                        fontSize: Typography.sm, 
+                        fontWeight: Typography.semibold,
+                        color: colors.textPrimary,
+                      }}>
+                        {volume.name || `Volume ${volume.number}`}
+                      </Text>
+                    </View>
+                  )}
+                  {/* Chapters in this volume */}
+                  {volumeChapters.map(({ chapter, volume: chVolume }) => {
+                    const chProgress = chapter.pages > 0 ? (chapter.pagesRead / chapter.pages) * 100 : 0;
+                    const chLabel = chapter.title || `Chapter ${chapter.number}`;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={chapter.id}
+                        style={styles.chapterRow}
+                        onPress={() => openChapter(chapter, chVolume)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={styles.chapterLeft}>
+                          <Text style={styles.chapterNum}>{chLabel}</Text>
+                          <View style={styles.chapterMeta}>
+                            <Text style={styles.chapterPages}>{chapter.pages} pages</Text>
+                          </View>
+                        </View>
+                        <View style={styles.chapterRight}>
+                          {chProgress > 0 && chProgress < 100 ? (
+                            <View style={styles.chapterProgressContainer}>
+                              <View style={styles.chapterProgressTrack}>
+                                <View style={[styles.chapterProgressFill, { width: `${chProgress}%` }]} />
+                              </View>
+                              <Text style={styles.chapterProgressText}>{Math.round(chProgress)}%</Text>
+                            </View>
+                          ) : chProgress >= 100 ? (
+                            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                          ) : (
+                            <Ionicons name="play-circle-outline" size={20} color={colors.textMuted} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ));
+            })()
           )}
         </View>
       </ScrollView>
@@ -470,10 +677,8 @@ function makeStyles(c: ColorScheme) {
     seriesTitle: { fontSize: Typography.xxl, fontWeight: Typography.bold as any, color: c.textPrimary, fontFamily: Typography.serif, lineHeight: 34 },
     authorText: { fontSize: Typography.md, color: c.accent, fontWeight: Typography.semibold as any, marginTop: -Spacing.xs },
     chipScroll: { flexGrow: 0 },
-    metaChip: { backgroundColor: c.accentSoft, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 4, marginRight: Spacing.xs, borderWidth: 1, borderColor: c.accent + '44' },
-    metaChipText: { fontSize: Typography.xs, color: c.accent, fontWeight: Typography.medium as any },
-    metaChipTag: { backgroundColor: c.surfaceElevated, borderColor: c.border },
-    metaChipTagText: { color: c.textSecondary },
+    metaChip: { borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 4, marginRight: Spacing.xs, borderWidth: 1 },
+    metaChipText: { fontSize: Typography.xs, fontWeight: Typography.medium as any },
     summary: { fontSize: Typography.base, color: c.textSecondary, lineHeight: 23 },
     summaryToggle: { fontSize: Typography.sm, color: c.accent, marginTop: 4 },
     progressRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: Spacing.sm },
