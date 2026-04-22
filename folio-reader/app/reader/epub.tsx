@@ -177,6 +177,7 @@ function buildPageHtml(rawHtml: string, { serverUrl, chapterId, apiKey, fontFami
   p { margin: 0 0 1em 0; }
   img {
     max-width: 100%;
+    max-height: 100vh;
     height: auto;
     break-inside: avoid;
     display: block;

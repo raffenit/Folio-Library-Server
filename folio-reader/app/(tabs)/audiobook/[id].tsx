@@ -593,11 +593,11 @@ export default function AudiobookPlayerScreen() {
               {/* Description */}
               {displaySummary ? (
                 <TouchableOpacity onPress={() => setDescExpanded(v => !v)} activeOpacity={0.8}>
-                  {descExpanded ? (
-                    <MarkdownText content={displaySummary} />
-                  ) : (
-                    <Text style={styles.desc} numberOfLines={4}>{displaySummary}</Text>
-                  )}
+                  <MarkdownText
+                    content={displaySummary}
+                    numberOfLines={descExpanded ? undefined : 4}
+                    style={styles.desc}
+                  />
                   <Text style={styles.descToggle}>{descExpanded ? 'Show less' : 'Read more'}</Text>
                 </TouchableOpacity>
               ) : (
