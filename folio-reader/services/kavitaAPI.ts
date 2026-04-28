@@ -177,6 +177,8 @@ class KavitaAPI {
   private client: AxiosInstance;
   private serverUrl: string = '';
   private apiKey: string = '';
+  private username: string = '';
+  private password: string = '';
   private jwtToken: string = '';
   private progressTrackingEnabled: boolean = true;
   private proxyOrigin: string | null = null;
@@ -270,11 +272,17 @@ class KavitaAPI {
     try {
       const storedUrl = await credentials.kavita.getServerUrl();
       const storedKey = await credentials.kavita.getApiKey();
+      const storedUsername = await credentials.kavita.getUsername();
+      const storedPassword = await credentials.kavita.getPassword();
       this.progressTrackingEnabled = await credentials.kavita.isProgressTrackingEnabled();
 
-      if (storedUrl && storedKey) {
-        this.setServer(storedUrl, storedKey);
-        
+      if (storedUrl) {
+        this.setServer(storedUrl, storedKey || '');
+
+        // Load username/password for JWT auth
+        if (storedUsername) this.username = storedUsername;
+        if (storedPassword) this.password = storedPassword;
+
         // Try to load JWT token (profile-specific)
         const storedJwt = await credentials.kavita.getJwtToken();
         if (storedJwt) {
@@ -308,10 +316,16 @@ class KavitaAPI {
     this.client.defaults.baseURL = clean;
   }
 
-  async saveCredentials(serverUrl: string, apiKey: string) {
-    this.setServer(serverUrl, apiKey);
+  async saveCredentials(serverUrl: string, username: string, password: string, apiKey?: string) {
+    this.setServer(serverUrl, apiKey || '');
+    this.username = username;
+    this.password = password;
     await credentials.kavita.setServerUrl(this.serverUrl);
-    await credentials.kavita.setApiKey(apiKey);
+    await credentials.kavita.setUsername(username);
+    await credentials.kavita.setPassword(password);
+    if (apiKey) {
+      await credentials.kavita.setApiKey(apiKey);
+    }
   }
 
   async loadCredentials() {
@@ -326,63 +340,67 @@ class KavitaAPI {
   async clearCredentials() {
     this.serverUrl = '';
     this.apiKey = '';
+    this.username = '';
+    this.password = '';
     this.client.defaults.baseURL = '';
     await credentials.kavita.clearAll();
   }
 
   async login(): Promise<boolean> {
     try {
-      // Use the apiKey to get a JWT (GET request, not POST)
-      const response = await this.client.get('/api/Plugin/authenticate', {
-        params: { 
-          apiKey: this.apiKey, 
-          pluginName: 'Folio'
-        },
+      // New Kavita versions use JWT authentication via Account/login
+      const response = await this.client.post('/api/Account/login', {
+        username: this.username,
+        password: this.password,
       });
+
       if (response.data?.token) {
         this.jwtToken = response.data.token;
-        
+
         // CRITICAL: Set the default header so future requests aren't 401
         this.client.defaults.headers.common['Authorization'] = `Bearer ${this.jwtToken}`;
-        
+
         await credentials.kavita.setJwtToken(this.jwtToken);
+        console.log('[KavitaAPI] JWT login successful');
         return true;
       }
       return false;
     } catch (error: any) {
       const status = error?.response?.status;
-      console.error('[KavitaAPI] Login error:', status, error?.response?.data || error?.message);
-      
-      // 404 means this Kavita version doesn't have the Plugin API
-      // Validate the API key works by making a test request
-      if (status === 404) {
+      const message = error?.response?.data || error?.message;
+      console.error('[KavitaAPI] Login error:', status, message);
+
+      // 404 might mean old Kavita version - try deprecated Plugin API
+      if (status === 404 && this.apiKey) {
+        console.log('[KavitaAPI] Falling back to deprecated Plugin API...');
         try {
-          // Test the API key by calling /api/Library with apiKey param
-          // Note: The interceptor will add apiKey automatically, but we add it explicitly here too
-          const testResponse = await this.client.get('/api/Library', {
-            params: { apiKey: this.apiKey },
-            timeout: 10000 // 10 second timeout for validation
+          const response = await this.client.get('/api/Plugin/authenticate', {
+            params: {
+              apiKey: this.apiKey,
+              pluginName: 'Folio'
+            },
           });
-          // Accept any 2xx status (200 OK, 204 No Content, etc.)
-          if (testResponse.status >= 200 && testResponse.status < 300) {
-            // Mark as authenticated with API key (no JWT)
+          if (response.data?.token) {
+            this.jwtToken = response.data.token;
+            this.client.defaults.headers.common['Authorization'] = `Bearer ${this.jwtToken}`;
+            await credentials.kavita.setJwtToken(this.jwtToken);
             return true;
           }
-        } catch (testError: any) {
-          console.error('[KavitaAPI] API key validation failed:', testError?.response?.status, testError?.message);
+        } catch (pluginError: any) {
+          console.error('[KavitaAPI] Plugin API also failed:', pluginError?.response?.status);
           return false;
         }
-        return false;
       }
-      
-      // Re-throw other errors (500, network issues, etc.)
-      throw error;
+
+      return false;
     }
   }
 
   async logout() {
     this.jwtToken = '';
     this.apiKey = '';
+    this.username = '';
+    this.password = '';
     this.serverUrl = '';
     await credentials.kavita.clearJwtToken();
     await credentials.kavita.clearAll();
@@ -391,8 +409,9 @@ class KavitaAPI {
   isAuthenticated(): boolean { return !!this.jwtToken; }
 
   hasCredentials(): boolean {
-    if (this.proxyOrigin) return !!this.apiKey;
-    return !!this.serverUrl && !!this.apiKey;
+    // New JWT auth requires username/password; fallback to API key for older versions
+    if (this.proxyOrigin) return !!this.username && !!this.password;
+    return !!this.serverUrl && !!this.username && !!this.password;
   }
 
   isProgressTrackingEnabled(): boolean {

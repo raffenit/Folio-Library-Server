@@ -24,6 +24,8 @@ export const ENV_VARS = {
   KAVITA: {
     URL: 'EXPO_PUBLIC_KAVITA_URL',
     API_KEY: 'EXPO_PUBLIC_KAVITA_API_KEY',
+    USERNAME: 'EXPO_PUBLIC_KAVITA_USERNAME',
+    PASSWORD: 'EXPO_PUBLIC_KAVITA_PASSWORD',
   },
   ABS: {
     URL: 'EXPO_PUBLIC_ABS_URL',
@@ -47,6 +49,8 @@ export const STORAGE_KEYS = {
   KAVITA: {
     SERVER_URL: 'folio_kavita_server_url',
     API_KEY: 'folio_kavita_api_key',
+    USERNAME: 'folio_kavita_username',
+    PASSWORD: 'folio_kavita_password',
     JWT_TOKEN: 'folio_kavita_jwt_token',
     PROGRESS_TRACKING: 'folio_kavita_progress_tracking',
     ON_DECK_CACHE: 'folio_kavita_on_deck_cache',
@@ -149,7 +153,25 @@ export const credentials = {
     async setApiKey(key: string): Promise<void> {
       await storage.setItem(STORAGE_KEYS.KAVITA.API_KEY, key);
     },
-    
+
+    async getUsername(): Promise<string | null> {
+      return getEnv(ENV_VARS.KAVITA.USERNAME) ||
+             await storage.getItem(STORAGE_KEYS.KAVITA.USERNAME);
+    },
+
+    async setUsername(username: string): Promise<void> {
+      await storage.setItem(STORAGE_KEYS.KAVITA.USERNAME, username);
+    },
+
+    async getPassword(): Promise<string | null> {
+      return getEnv(ENV_VARS.KAVITA.PASSWORD) ||
+             await storage.getItem(STORAGE_KEYS.KAVITA.PASSWORD);
+    },
+
+    async setPassword(password: string): Promise<void> {
+      await storage.setItem(STORAGE_KEYS.KAVITA.PASSWORD, password);
+    },
+
     async getJwtToken(): Promise<string | null> {
       const key = getProfileScopedKey(STORAGE_KEYS.KAVITA.JWT_TOKEN);
       return await storage.getItem(key);
@@ -177,6 +199,8 @@ export const credentials = {
     async clearAll(): Promise<void> {
       await storage.deleteItem(STORAGE_KEYS.KAVITA.SERVER_URL);
       await storage.deleteItem(STORAGE_KEYS.KAVITA.API_KEY);
+      await storage.deleteItem(STORAGE_KEYS.KAVITA.USERNAME);
+      await storage.deleteItem(STORAGE_KEYS.KAVITA.PASSWORD);
       await this.clearJwtToken();
     },
   },
