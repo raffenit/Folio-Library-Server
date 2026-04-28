@@ -66,13 +66,15 @@ GET /api/endpoint?apiKey=YOUR_API_KEY
 
 | Endpoint | Auth Method | Status |
 |----------|-------------|--------|
-| `GET /api/image/series-cover` | `?apiKey=` query param | ⚠️ JWT doesn't work in URL |
-| `GET /api/image/library-cover` | `?apiKey=` query param | ⚠️ JWT doesn't work in URL |
-| `GET /api/image/volume-cover` | `?apiKey=` query param | ⚠️ JWT doesn't work in URL |
-| `GET /api/image/chapter-cover` | `?apiKey=` query param | ⚠️ JWT doesn't work in URL |
-| `GET /api/image/collection-cover` | `?apiKey=` query param | ⚠️ JWT doesn't work in URL |
+| `GET /api/image/series-cover` | `?apiKey=` query param | ✓ **Confirmed working** |
+| `GET /api/image/library-cover` | `?apiKey=` query param | ✓ **Confirmed working** |
+| `GET /api/image/volume-cover` | `?apiKey=` query param | ✓ **Confirmed working** |
+| `GET /api/image/chapter-cover` | `?apiKey=` query param | ✓ **Confirmed working** |
+| `GET /api/image/collection-cover` | `?apiKey=` query param | ✓ **Confirmed working** |
 
-**Issue:** JWT tokens must be sent in the `Authorization` header, but `<img>` tags can't set headers. Image endpoints only accept `apiKey` query parameter.
+**Confirmed:** Direct browser access to `?seriesId=1&apiKey=KEY` returns PNG image ✓
+
+**Note:** JWT tokens cannot be used for image endpoints because they require the `Authorization` header, which `<img>` tags cannot set. Image endpoints **only** accept `apiKey` query parameter.
 
 ---
 
@@ -173,6 +175,7 @@ curl -I http://100.104.199.67:8050/api/image/series-cover?seriesId=1 \
 | 2026-04-27 | Initial JWT auth implementation | - |
 | 2026-04-27 | Fixed cover URLs to use apiKey | - |
 | 2026-04-27 | Fixed volumes array type checking | - |
+| 2026-04-27 | **Confirmed:** Image endpoints work with `?apiKey=` param (direct browser test) | - |
 
 ---
 
