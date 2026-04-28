@@ -10,12 +10,19 @@ Quick guide to all Docker-related files in this project.
 | `docker-compose.yml` | Development setup | Local testing, simple deployment |
 | `docker-compose.caddy.template.yml` | Production template | Full-stack with reverse proxy (copy & customize) |
 
-## Deploy/Webhook Files (CI/CD automation)
+## Webhook/Automation Files (Backend Services)
 
 | File | Purpose | When to Use |
 |------|---------|-------------|
-| `Dockerfile.deploy` | Builds webhook container | Automated deployments via git push |
-| `../docker-compose.deploy.yml` | Runs webhook server | In root directory - for production CI/CD |
+| `Dockerfile.webhook` | Builds webhook/sync container | Enable profile sync + auto-deploy |
+| `../docker-compose.webhook.yml` | Runs backend services server | In root directory - for profile sync & webhooks |
+
+**What these actually do:**
+1. **Profile Sync** (`/api/profiles/*`) - Syncs user settings across devices
+2. **Deploy Webhook** (`POST /deploy`) - Auto-rebuilds Folio on git push
+3. **Config Discovery** (`/api/config`) - Helps clients find the sync server
+
+Runs on port 9000 - completely separate from Folio app (port 3000).
 
 ## Build Scripts
 
@@ -45,7 +52,7 @@ Quick guide to all Docker-related files in this project.
 |----------|------|
 | "I just want to run Folio" | `docker-compose.yml` |
 | "I have Caddy/Nginx reverse proxy" | `docker-compose.caddy.template.yml` (copy & edit) |
-| "I want auto-deploy on git push" | `../docker-compose.deploy.yml` (in root) |
+| "I want auto-deploy on git push" | `../docker-compose.webhook.yml` (in root) |
 
 ## File Locations
 
@@ -53,14 +60,14 @@ Quick guide to all Docker-related files in this project.
 Folio/
 ├── folio-reader/               # Main app code
 │   ├── Dockerfile              # ← Main app image
-│   ├── Dockerfile.deploy        # ← Webhook image (for CI/CD)
+│   ├── Dockerfile.webhook        # ← Webhook image (for CI/CD)
 │   ├── docker-compose.yml       # ← Simple dev setup
 │   ├── docker-compose.caddy.template.yml  # ← Production template
 │   ├── deploy.bat              # ← Windows helper
 │   ├── deploy.ps1              # ← PowerShell helper
 │   └── server.js               # ← Node.js server (used by Dockerfile)
 │
-└── docker-compose.deploy.yml    # ← Webhook runner (in ROOT, not folio-reader/)
+└── docker-compose.webhook.yml    # ← Webhook runner (in ROOT, not folio-reader/)
 ```
 
 ## Quick Commands
@@ -77,7 +84,7 @@ cd ..
 # Edit ../docker-compose.yml for your setup
 docker-compose up -d
 
-# Enable auto-deploy webhook
+# Enable webhook server (profile sync + auto-deploy)
 cd ..  # Root directory
-docker-compose -f docker-compose.deploy.yml up -d
+docker-compose -f docker-compose.webhook.yml up -d
 ```
