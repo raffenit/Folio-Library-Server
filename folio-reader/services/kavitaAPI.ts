@@ -426,16 +426,13 @@ class KavitaAPI {
 
   async getLibraries(): Promise<Library[]> {
     // Try /api/Library first (standard endpoint)
-    let response = await this.client.get('/api/Library', {
-      params: this.apiKey ? { apiKey: this.apiKey } : undefined
-    });
+    // Authentication is handled by the request interceptor (JWT header or API key param)
+    let response = await this.client.get('/api/Library');
     
     // If 204/empty, try /api/Library/all
     if (!Array.isArray(response.data) || response.data.length === 0) {
       try {
-        const allResponse = await this.client.get('/api/Library/all', {
-          params: this.apiKey ? { apiKey: this.apiKey } : undefined
-        });
+        const allResponse = await this.client.get('/api/Library/all');
         if (Array.isArray(allResponse.data) && allResponse.data.length > 0) {
           response = allResponse;
         }
