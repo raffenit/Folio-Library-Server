@@ -755,34 +755,29 @@ class KavitaAPI {
   // ── Cover image URLs ─────────────────────────────────────────────────────────
 
   getSeriesCoverUrl(seriesId: number): string {
-    // Use JWT token if available, otherwise fall back to API key
-    const token = this.jwtToken || this.apiKey;
-    const tokenParam = this.jwtToken ? `jwtToken=${encodeURIComponent(token)}` : `apiKey=${encodeURIComponent(token)}`;
-    return `${this.serverUrl}/api/image/series-cover?seriesId=${seriesId}&${tokenParam}`;
+    // Image URLs must use apiKey param (JWT can't be passed in URL for img tags)
+    const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
+    return `${this.serverUrl}/api/image/series-cover?seriesId=${seriesId}${params}`;
   }
 
   getChapterCoverUrl(chapterId: number): string {
-    const token = this.jwtToken || this.apiKey;
-    const tokenParam = this.jwtToken ? `jwtToken=${encodeURIComponent(token)}` : `apiKey=${encodeURIComponent(token)}`;
-    return `${this.serverUrl}/api/image/chapter-cover?chapterId=${chapterId}&${tokenParam}`;
+    const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
+    return `${this.serverUrl}/api/image/chapter-cover?chapterId=${chapterId}${params}`;
   }
 
   getVolumeCoverUrl(volumeId: number): string {
-    const token = this.jwtToken || this.apiKey;
-    const tokenParam = this.jwtToken ? `jwtToken=${encodeURIComponent(token)}` : `apiKey=${encodeURIComponent(token)}`;
-    return `${this.serverUrl}/api/image/volume-cover?volumeId=${volumeId}&${tokenParam}`;
+    const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
+    return `${this.serverUrl}/api/image/volume-cover?volumeId=${volumeId}${params}`;
   }
 
   getLibraryCoverUrl(libraryId: number): string {
-    const token = this.jwtToken || this.apiKey;
-    const tokenParam = this.jwtToken ? `jwtToken=${encodeURIComponent(token)}` : `apiKey=${encodeURIComponent(token)}`;
-    return `${this.serverUrl}/api/image/library-cover?libraryId=${libraryId}&${tokenParam}`;
+    const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
+    return `${this.serverUrl}/api/image/library-cover?libraryId=${libraryId}${params}`;
   }
 
   getCollectionCoverUrl(collectionId: number): string {
-    const token = this.jwtToken || this.apiKey;
-    const tokenParam = this.jwtToken ? `jwtToken=${encodeURIComponent(token)}` : `apiKey=${encodeURIComponent(token)}`;
-    return `${this.serverUrl}/api/image/collection-cover?collectionTagId=${collectionId}&${tokenParam}`;
+    const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
+    return `${this.serverUrl}/api/image/collection-cover?collectionTagId=${collectionId}${params}`;
   }
 
   // ── Reader URLs ──────────────────────────────────────────────────────────────
