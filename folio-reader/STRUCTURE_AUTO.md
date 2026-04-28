@@ -1,3 +1,15 @@
+# Folio Auto-Generated Structure
+
+> **Purpose**: Auto-generated export analysis of the **actual current** codebase state.
+>
+> **How to use**: This file is generated automatically by analyzing `export` statements.
+> Compare against `STRUCTURE.md` (our understanding/intent) to verify they match.
+> If exports appear here but not in STRUCTURE.md, either update docs or remove dead code.
+
+---
+
+## Generated Export List
+
 app/(tabs)/audiobook/[id].tsx:34:export function SeekBar({ current, duration, onSeek, tracks }: {
 app/(tabs)/series/[id].tsx:35:export function flatChapters(volumes: LibraryVolume[]) {
 components/AudiobookCard.tsx:18:export function AudiobookCard({ item, onPress, onPlay, isPlaying, cardWidth, onContextMenu }: AudiobookCardProps) {
