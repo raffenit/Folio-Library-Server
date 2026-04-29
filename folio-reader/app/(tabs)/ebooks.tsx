@@ -564,6 +564,7 @@ export default function EbooksScreen() {
   const [loading, setLoading] = useState(true);
   const [seriesLoading, setSeriesLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [coverVersion, setCoverVersion] = useState(0); // Increment to force cover refresh after upload
 
   const [libraries, setLibraries] = useState<any[]>([]);
   const [selectedLibraryId, setSelectedLibraryId] = useState<number | null>(null);
@@ -749,6 +750,8 @@ export default function EbooksScreen() {
       fetchMetadata(false); // false = use cache if available
       // Refresh the continue reading setting in case it changed
       setShowContinueReading(kavitaAPI.isProgressTrackingEnabled());
+      // Force cover refresh in case user uploaded new cover on detail page
+      setCoverVersion(v => v + 1);
     }, [fetchMetadata])
   );
 
@@ -949,6 +952,7 @@ export default function EbooksScreen() {
           }
         }}
         cardWidth={cardWidth}
+        coverVersion={coverVersion}
       />
       {isSelectionMode && (
         <TouchableOpacity
@@ -981,7 +985,7 @@ export default function EbooksScreen() {
         </TouchableOpacity>
       )}
     </View>
-  ), [isSelectionMode, router, toggleSelection, selectedIds, openMenu, cardWidth, colors.accent, colors.textOnAccent]);
+  ), [isSelectionMode, router, toggleSelection, selectedIds, openMenu, cardWidth, colors.accent, colors.textOnAccent, coverVersion]);
 
   if (authLoading || loading) {
     return (

@@ -9,7 +9,7 @@ import {
   RefreshControl,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { LibraryFactory } from '../../services/LibraryFactory';
 import { LibraryGenre, LibraryTag, LibraryItem } from '../../services/LibraryProvider';
 import { SeriesCard } from '../../components/SeriesCard';
@@ -39,6 +39,7 @@ export default function BrowseScreen() {
   const [seriesLoading, setSeriesLoading] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [coverVersion, setCoverVersion] = useState(0); // Force cover refresh after upload
 
   const fetchMetadata = useCallback(async () => {
     setMetaLoading(true);
@@ -60,6 +61,13 @@ export default function BrowseScreen() {
   useEffect(() => {
     fetchMetadata();
   }, []);
+
+  // Force cover refresh when returning from detail page (cover may have been uploaded)
+  useFocusEffect(
+    useCallback(() => {
+      setCoverVersion(v => v + 1);
+    }, [])
+  );
 
   async function loadSeriesByGenre(genre: LibraryGenre, pageNum: number) {
     setSeriesLoading(true);
@@ -145,8 +153,9 @@ export default function BrowseScreen() {
       onPress={() => router.push(serverType === 'abs' ? `/audiobook/${item.id}` : `/series/${item.id}`)}
       onContextMenu={openMenu}
       cardWidth={cardWidth}
+      coverVersion={coverVersion}
     />
-  ), [router, serverType, openMenu, cardWidth]);
+  ), [router, serverType, openMenu, cardWidth, coverVersion]);
 
   if (metaLoading) {
     return (

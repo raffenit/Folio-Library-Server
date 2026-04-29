@@ -154,8 +154,15 @@ export default function SeriesDetailScreen() {
 
   const coverUrl = useMemo(() => {
     if (!detail) return '';
-    return provider.getCoverUrl(detail.id) + `?v=${coverKey}`;
+    const url = provider.getCoverUrl(detail.id) + `?v=${coverKey}`;
+    console.log(`[SeriesDetail] coverUrl generated: ${url.substring(0, 80)}...`);
+    return url;
   }, [detail, provider, coverKey]);
+
+  // DEBUG: Log when coverKey changes
+  useEffect(() => {
+    console.log(`[SeriesDetail] coverKey changed to: ${coverKey}`);
+  }, [coverKey]);
 
   const authors = detail?.authorName || '';
   const displayName = detail?.localizedName || detail?.name || '';
@@ -265,7 +272,9 @@ export default function SeriesDetailScreen() {
                 key={coverKey} 
                 source={{ uri: coverUrl }} 
                 style={isLargeScreen ? styles.coverSidebar : styles.coverSmall} 
-                resizeMode="cover" 
+                resizeMode="cover"
+                onLoad={() => console.log(`[SeriesDetail] Image loaded: ${coverUrl.substring(0, 80)}...`)}
+                onError={(e: any) => console.error(`[SeriesDetail] Image failed:`, e.nativeEvent?.error || 'Unknown error')}
               />
               <View style={styles.coverEditOverlay}>
                 <Ionicons name="camera-outline" size={16} color="#fff" />
@@ -645,7 +654,11 @@ export default function SeriesDetailScreen() {
         authorName={authors}
         providerType={type}
         onClose={() => setCoverPickerVisible(false)}
-        onSaved={() => { setCoverKey(k => k + 1); refresh(); }}
+        onSaved={() => { 
+          console.log('[SeriesDetail] Cover saved, incrementing coverKey');
+          setCoverKey(k => k + 1); 
+          refresh(); 
+        }}
       />
       <MetadataSearchModal
         visible={metaSearchVisible}
