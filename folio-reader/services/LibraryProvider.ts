@@ -145,7 +145,7 @@ export interface LibraryProvider {
   /**
    * Helper to resolve cover URLs
    */
-  getCoverUrl(id: string | number): string;
+  getCoverUrl(id: string | number, bustCache?: boolean): string;
 
   /**
    * Check authentication status
