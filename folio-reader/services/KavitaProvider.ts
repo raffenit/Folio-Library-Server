@@ -194,7 +194,8 @@ export class KavitaProvider implements LibraryProvider {
 
   getCoverUrl(id: string | number): string {
     const seriesId = typeof id === 'string' ? parseInt(id, 10) : id;
-    return kavitaAPI.getSeriesCoverUrl(seriesId);
+    // Always bust cache to ensure new uploads appear immediately
+    return kavitaAPI.getSeriesCoverUrl(seriesId, true);
   }
 }
 

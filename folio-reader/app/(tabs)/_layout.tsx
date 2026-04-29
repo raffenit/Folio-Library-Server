@@ -219,15 +219,13 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* Hidden tabs — files kept for router compatibility */}
+      {/* Hidden tabs — group routes registered by folder name only */}
       <Tabs.Screen name="ebooks" options={{ href: null }} />
       <Tabs.Screen name="libraries" options={{ href: null }} />
       <Tabs.Screen name="collections" options={{ href: null }} />
       <Tabs.Screen name="browse" options={{ href: null }} />
       <Tabs.Screen name="audiobook" options={{ href: null }} />
-      <Tabs.Screen name="audiobook/[id]" options={{ href: null }} />
       <Tabs.Screen name="series" options={{ href: null }} />
-      <Tabs.Screen name="series/[id]" options={{ href: null }} />
     </Tabs>
     </SwipeableTabs>
   );

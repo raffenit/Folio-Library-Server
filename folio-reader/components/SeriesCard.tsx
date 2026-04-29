@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -35,10 +35,15 @@ function getFormatIcon(format: number): string {
 export function SeriesCard({ series, onPress, onContextMenu, style, cardWidth }: Props) {
   const { colors } = useTheme();
   const progress = (series.progress || 0) * 100;
-  
+
   const provider = LibraryFactory.getProvider(series.provider || 'kavita');
   const coverUrl = provider.getCoverUrl(series.id);
   const containerRef = useRef<View>(null);
+
+  // DEBUG: Log cover URL for troubleshooting
+  useEffect(() => {
+    console.log(`[SeriesCard] ${series.title} (id=${series.id}): coverUrl=${coverUrl?.substring(0, 80)}...`);
+  }, [series.id, series.title, coverUrl]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !onContextMenu) return;
@@ -73,6 +78,13 @@ export function SeriesCard({ series, onPress, onContextMenu, style, cardWidth }:
           source={{ uri: coverUrl }}
           style={styles.cover}
           resizeMode="cover"
+          onError={(e) => {
+            console.error(`[SeriesCard] Image load failed for ${series.title}:`, e.nativeEvent?.error || 'Unknown error');
+            console.error(`[SeriesCard] Failed URL: ${coverUrl}`);
+          }}
+          onLoad={() => {
+            console.log(`[SeriesCard] Image loaded: ${series.title}`);
+          }}
         />
         {/* Hover title overlay - web only */}
         {Platform.OS === 'web' && (

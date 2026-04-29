@@ -1,3 +1,9 @@
+# Docker Compose - Development Setup
+# Builds and runs Folio PWA locally for development/testing
+# For production with reverse proxy, see docker-compose.caddy.template.yml
+#
+# Usage: docker-compose up -d
+
 services:
   folio:
     build:

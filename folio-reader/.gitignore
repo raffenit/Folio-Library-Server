@@ -19,3 +19,9 @@ ios/
 
 expo-env.d.ts
 # @end expo-clicerts/
+
+# Debug logs directory - keep structure, ignore contents
+logs/**/*.log
+logs/**/*.txt
+!logs/**/.gitkeep
+!logs/README.md

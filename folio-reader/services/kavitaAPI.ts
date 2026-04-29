@@ -437,7 +437,8 @@ class KavitaAPI {
           response = allResponse;
         }
       } catch {
-        // /api/Library/all failed
+        // /api/Library/all failed (404 or other error) - this is expected in Kavita v2
+        // The endpoint doesn't exist, we gracefully fall back to the main /api/Library response
       }
     }
     
@@ -739,8 +740,13 @@ class KavitaAPI {
     
     try {
       console.log(`[KavitaAPI] POST /api/Upload/series with JWT: ${this.jwtToken ? 'present' : 'missing'}`);
+      console.log(`[KavitaAPI] Request body: id=${seriesId}, url length=${url.length}, url start=${url.substring(0, 50)}...`);
       const response = await this.client.post('/api/Upload/series', { id: seriesId, url });
-      console.log(`[KavitaAPI] Cover upload response: ${response.status}`, response.data);
+      console.log(`[KavitaAPI] Cover upload response: ${response.status}`, JSON.stringify(response.data));
+      // Check if response indicates success
+      if (response.data && typeof response.data === 'object') {
+        console.log(`[KavitaAPI] Response keys:`, Object.keys(response.data));
+      }
     } catch (e: any) {
       console.error(`[KavitaAPI] Cover upload error:`, {
         status: e?.response?.status,
@@ -770,10 +776,11 @@ class KavitaAPI {
 
   // ── Cover image URLs ─────────────────────────────────────────────────────────
 
-  getSeriesCoverUrl(seriesId: number): string {
+  getSeriesCoverUrl(seriesId: number, bustCache?: boolean): string {
     // Image URLs must use apiKey param (JWT can't be passed in URL for img tags)
     const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
-    return `${this.serverUrl}/api/image/series-cover?seriesId=${seriesId}${params}`;
+    const cacheBust = bustCache ? `&t=${Date.now()}` : '';
+    return `${this.serverUrl}/api/image/series-cover?seriesId=${seriesId}${params}${cacheBust}`;
   }
 
   getChapterCoverUrl(chapterId: number): string {

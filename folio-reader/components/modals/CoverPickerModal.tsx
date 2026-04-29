@@ -88,7 +88,7 @@ export function CoverPickerModal({
       // Note: allowsEditing and aspect are only supported on native platforms
       const aspect: [number, number] = providerType === 'abs' ? [1, 1] : [2, 3];
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images',
         allowsEditing: Platform.OS !== 'web',
         aspect: Platform.OS !== 'web' ? aspect : undefined,
         quality: 0.9,

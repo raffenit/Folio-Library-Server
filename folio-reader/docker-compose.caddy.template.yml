@@ -1,7 +1,12 @@
-version: '3.8'
+# TEMPLATE: Production Setup with Caddy Reverse Proxy
+# ⚠️  This is a TEMPLATE - copy relevant parts to your actual docker-compose.yml
+#
+# Purpose: Example full-stack setup with Folio + Kavita + ABS behind Caddy
+# Features: Automatic HTTPS, internal networking, no exposed ports on backend services
+#
+# Usage: Copy the 'folio' service (and Caddy if needed) into your docker-compose.yml
 
-# This is an example docker-compose for use WITH Caddy as reverse proxy
-# Copy the folio service into your existing docker-compose that has Caddy
+version: '3.8'
 
 services:
   # Add Folio - no ports needed, Caddy will proxy to it
