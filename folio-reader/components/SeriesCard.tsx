@@ -44,7 +44,11 @@ export const SeriesCard = React.memo(function SeriesCard({ series, onPress, onCo
   const provider = LibraryFactory.getProvider(seriesProvider);
   // Memoize coverUrl to prevent regeneration on every render (causes image reload flicker)
   // Include coverVersion in dependencies to force refresh after upload
-  const coverUrl = useMemo(() => provider.getCoverUrl(series.id), [provider, series.id, coverVersion]);
+  const coverUrl = useMemo(() => {
+    const baseUrl = provider.getCoverUrl(series.id);
+    // Use &v= since getCoverUrl already has ?seriesId=...&apiKey=...&t=...
+    return coverVersion ? `${baseUrl}&v=${coverVersion}` : baseUrl;
+  }, [provider, series.id, coverVersion]);
   const containerRef = useRef<View>(null);
 
   // DEBUG: Log cover URL for troubleshooting
@@ -132,7 +136,11 @@ export const SeriesCardLarge = React.memo(function SeriesCardLarge({ series, onP
   const provider = LibraryFactory.getProvider(series.provider || 'kavita');
   // Memoize coverUrl to prevent regeneration on every render (causes image reload flicker)
   // Include coverVersion in dependencies to force refresh after upload
-  const coverUrl = useMemo(() => provider.getCoverUrl(realId), [provider, realId, coverVersion]);
+  const coverUrl = useMemo(() => {
+    const baseUrl = provider.getCoverUrl(realId);
+    // Use &v= since getCoverUrl already has ?seriesId=...&apiKey=...&t=...
+    return coverVersion ? `${baseUrl}&v=${coverVersion}` : baseUrl;
+  }, [provider, realId, coverVersion]);
   const containerRef = useRef<View>(null);
 
   useEffect(() => {
