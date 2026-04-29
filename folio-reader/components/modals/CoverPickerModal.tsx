@@ -119,8 +119,10 @@ export function CoverPickerModal({
     setError('');
     try {
       await provider.updateSeriesCover(seriesId, urlOrBase64);
-      // Wait a bit for the server to process the cover change
-      await new Promise(r => setTimeout(r, 1500));
+      // Wait longer for Kavita to process and save the cover file
+      console.log('[CoverPicker] Upload complete, waiting for server processing...');
+      await new Promise(r => setTimeout(r, 3000));
+      console.log('[CoverPicker] Delay complete, notifying parent to refresh');
       onSaved();
       onClose();
     } catch (e: any) {

@@ -628,10 +628,10 @@ class AudiobookshelfAPI {
     }
   }
 
-  getCoverUrl(itemId: string, version?: number): string {
+  getCoverUrl(itemId: string | number, bustCache?: boolean): string {
     let url = `${this.serverUrl}/api/items/${itemId}/cover?token=${this.apiKey}`;
-    if (version) {
-      url += `&v=${version}`;
+    if (bustCache) {
+      url += `&t=${Date.now()}`;
     }
     
     if (this.proxyOrigin) {
