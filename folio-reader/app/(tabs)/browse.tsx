@@ -138,6 +138,16 @@ export default function BrowseScreen() {
     ? (item: LibraryGenre | LibraryTag) => selectGenre(item as LibraryGenre)
     : (item: LibraryGenre | LibraryTag) => selectTag(item as LibraryTag);
 
+  // Memoized renderItem to prevent unnecessary re-renders while scrolling
+  const renderSeriesCard = useCallback(({ item }: { item: LibraryItem }) => (
+    <SeriesCard
+      series={item}
+      onPress={() => router.push(serverType === 'abs' ? `/audiobook/${item.id}` : `/series/${item.id}`)}
+      onContextMenu={openMenu}
+      cardWidth={cardWidth}
+    />
+  ), [router, serverType, openMenu, cardWidth]);
+
   if (metaLoading) {
     return (
       <View style={styles.centered}>
@@ -243,14 +253,7 @@ export default function BrowseScreen() {
               </View>
             ) : null
           }
-          renderItem={({ item }) => (
-            <SeriesCard
-              series={item}
-              onPress={() => router.push(serverType === 'abs' ? `/audiobook/${item.id}` : `/series/${item.id}`)}
-              onContextMenu={openMenu}
-              cardWidth={cardWidth}
-            />
-          )}
+          renderItem={renderSeriesCard}
         />
       )}
       <SeriesContextMenu

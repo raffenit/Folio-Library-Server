@@ -926,6 +926,63 @@ export default function EbooksScreen() {
 
   const hasActiveFilter = selectedGenreId !== null || selectedTagId !== null || selectedCollectionId !== null || selectedAuthorId !== null;
 
+  // Memoized renderItem to prevent unnecessary re-renders while scrolling
+  const renderSeriesCard = useCallback(({ item }: { item: Series }) => (
+    <View style={{ position: 'relative' }}>
+      <SeriesCard
+        series={item as any}
+        onPress={() => {
+          if (isSelectionMode) {
+            toggleSelection(item.id);
+          } else {
+            router.push(`/series/${item.id}`);
+          }
+        }}
+        onContextMenu={(id, name, x, y) => {
+          if (isSelectionMode) {
+            // In selection mode, right-click opens bulk edit if items selected
+            if (selectedIds.size > 0) {
+              setShowBulkEditModal(true);
+            }
+          } else {
+            openMenu(id, name, x, y);
+          }
+        }}
+        cardWidth={cardWidth}
+      />
+      {isSelectionMode && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            zIndex: 10,
+            padding: 4,
+          }}
+          onPress={() => toggleSelection(item.id)}
+          activeOpacity={0.8}
+        >
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              borderWidth: 2,
+              borderColor: colors.accent,
+              backgroundColor: selectedIds.has(item.id) ? colors.accent : 'transparent',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            {selectedIds.has(item.id) && (
+              <Text style={{ color: colors.textOnAccent, fontSize: 14, fontWeight: 'bold' }}>✓</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      )}
+    </View>
+  ), [isSelectionMode, router, toggleSelection, selectedIds, openMenu, cardWidth, colors.accent, colors.textOnAccent]);
+
   if (authLoading || loading) {
     return (
       <View style={{ flex: 1, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' }}>
@@ -1053,59 +1110,7 @@ export default function EbooksScreen() {
             </View>
           ) : null
         }
-        renderItem={({ item }) => (
-          <View style={{ position: 'relative' }}>
-            <SeriesCard
-              series={item}
-              onPress={() => {
-                if (isSelectionMode) {
-                  toggleSelection(item.id);
-                } else {
-                  router.push(`/series/${item.id}`);
-                }
-              }}
-              onContextMenu={(id, name, x, y) => {
-                if (isSelectionMode) {
-                  // In selection mode, right-click opens bulk edit if items selected
-                  if (selectedIds.size > 0) {
-                    setShowBulkEditModal(true);
-                  }
-                } else {
-                  openMenu(id, name, x, y);
-                }
-              }}
-              cardWidth={cardWidth}
-            />
-            {isSelectionMode && (
-              <TouchableOpacity
-                style={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  zIndex: 10,
-                  padding: 4,
-                }}
-                onPress={() => toggleSelection(item.id)}
-                activeOpacity={0.8}
-              >
-                <View style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: selectedIds.has(item.id) ? colors.accent : colors.surface,
-                  borderWidth: 2,
-                  borderColor: selectedIds.has(item.id) ? colors.accent : colors.border,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                  {selectedIds.has(item.id) && (
-                    <Ionicons name="checkmark" size={16} color={colors.textOnAccent} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+        renderItem={renderSeriesCard}
       />
       </View>
 
