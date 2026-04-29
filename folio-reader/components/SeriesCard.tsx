@@ -36,14 +36,18 @@ export function SeriesCard({ series, onPress, onContextMenu, style, cardWidth }:
   const { colors } = useTheme();
   const progress = (series.progress || 0) * 100;
 
-  const provider = LibraryFactory.getProvider(series.provider || 'kavita');
+  // Handle both LibraryItem (title) and raw Kavita Series (name)
+  const seriesTitle = (series as any).title || (series as any).name || 'Unknown';
+  const seriesProvider = (series as any).provider || 'kavita';
+
+  const provider = LibraryFactory.getProvider(seriesProvider);
   const coverUrl = provider.getCoverUrl(series.id);
   const containerRef = useRef<View>(null);
 
   // DEBUG: Log cover URL for troubleshooting
   useEffect(() => {
-    console.log(`[SeriesCard] ${series.title} (id=${series.id}): coverUrl=${coverUrl?.substring(0, 80)}...`);
-  }, [series.id, series.title, coverUrl]);
+    console.log(`[SeriesCard] ${seriesTitle} (id=${series.id}): coverUrl=${coverUrl?.substring(0, 80)}...`);
+  }, [series.id, seriesTitle, coverUrl]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !onContextMenu) return;
@@ -51,15 +55,15 @@ export function SeriesCard({ series, onPress, onContextMenu, style, cardWidth }:
     if (!el) return;
     const handler = (e: MouseEvent) => {
       e.preventDefault();
-      onContextMenu(series.id, series.title, e.clientX, e.clientY);
+      onContextMenu(series.id, seriesTitle, e.clientX, e.clientY);
     };
     el.addEventListener('contextmenu', handler);
     return () => el.removeEventListener('contextmenu', handler);
-  }, [onContextMenu, series.id, series.title]);
+  }, [onContextMenu, series.id, seriesTitle]);
 
   function handleLongPress(e: GestureResponderEvent) {
     if (onContextMenu) {
-      onContextMenu(series.id, series.title, e.nativeEvent.pageX, e.nativeEvent.pageY);
+      onContextMenu(series.id, seriesTitle, e.nativeEvent.pageX, e.nativeEvent.pageY);
     }
   }
 
@@ -78,19 +82,19 @@ export function SeriesCard({ series, onPress, onContextMenu, style, cardWidth }:
           source={{ uri: coverUrl }}
           style={styles.cover}
           resizeMode="cover"
-          onError={(e) => {
-            console.error(`[SeriesCard] Image load failed for ${series.title}:`, e.nativeEvent?.error || 'Unknown error');
+          onError={(e: any) => {
+            console.error(`[SeriesCard] Image load failed for ${seriesTitle}:`, e.nativeEvent?.error || 'Unknown error');
             console.error(`[SeriesCard] Failed URL: ${coverUrl}`);
           }}
           onLoad={() => {
-            console.log(`[SeriesCard] Image loaded: ${series.title}`);
+            console.log(`[SeriesCard] Image loaded: ${seriesTitle}`);
           }}
         />
         {/* Hover title overlay - web only */}
         {Platform.OS === 'web' && (
           <View style={styles.hoverOverlay} pointerEvents="none">
             <View style={styles.titlePopup}>
-              <Text style={[styles.titlePopupText, { color: colors.textOnAccent }]} numberOfLines={2}>{series.title}</Text>
+              <Text style={[styles.titlePopupText, { color: colors.textOnAccent }]} numberOfLines={2}>{seriesTitle}</Text>
             </View>
           </View>
         )}
@@ -108,7 +112,7 @@ export function SeriesCard({ series, onPress, onContextMenu, style, cardWidth }:
           </View>
         )}
       </View>
-      <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>{series.title}</Text>
+      <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>{seriesTitle}</Text>
     </TouchableOpacity>
   );
 }
@@ -118,7 +122,10 @@ export function SeriesCardLarge({ series, onPress, onContextMenu }: Props) {
   const progress = (series.progress || 0) * 100;
   const isAbs = series.provider === 'abs' || series.mediaType === 'audiobook';
   const realId = series.id;
-  
+
+  // Handle both LibraryItem (title) and raw Kavita Series (name)
+  const seriesTitle = (series as any).title || (series as any).name || 'Unknown';
+
   const provider = LibraryFactory.getProvider(series.provider || 'kavita');
   const coverUrl = provider.getCoverUrl(realId);
   const containerRef = useRef<View>(null);
@@ -129,15 +136,15 @@ export function SeriesCardLarge({ series, onPress, onContextMenu }: Props) {
     if (!el) return;
     const handler = (e: MouseEvent) => {
       e.preventDefault();
-      onContextMenu(realId, series.title, e.clientX, e.clientY);
+      onContextMenu(realId, seriesTitle, e.clientX, e.clientY);
     };
     el.addEventListener('contextmenu', handler);
     return () => el.removeEventListener('contextmenu', handler);
-  }, [onContextMenu, realId, series.title]);
+  }, [onContextMenu, realId, seriesTitle]);
 
   function handleLongPress(e: GestureResponderEvent) {
     if (onContextMenu) {
-      onContextMenu(realId, series.title, e.nativeEvent.pageX, e.nativeEvent.pageY);
+      onContextMenu(realId, seriesTitle, e.nativeEvent.pageX, e.nativeEvent.pageY);
     }
   }
 
@@ -175,7 +182,7 @@ export function SeriesCardLarge({ series, onPress, onContextMenu }: Props) {
             <Text style={[styles.library, { color: colors.textMuted, fontSize: Typography.xs }]} numberOfLines={1}>{(series as any).libraryName}</Text>
           )}
         </View>
-        <Text style={[styles.titleLarge, { color: colors.textPrimary }]} numberOfLines={2}>{series.title}</Text>
+        <Text style={[styles.titleLarge, { color: colors.textPrimary }]} numberOfLines={2}>{seriesTitle}</Text>
         {progress > 0 && (
           <View style={styles.progressContainer}>
             <View style={[styles.progressTrack, { backgroundColor: colors.progressTrack }]}>
