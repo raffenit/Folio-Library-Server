@@ -437,7 +437,8 @@ class KavitaAPI {
           response = allResponse;
         }
       } catch {
-        // /api/Library/all failed
+        // /api/Library/all failed (404 or other error) - this is expected in Kavita v2
+        // The endpoint doesn't exist, we gracefully fall back to the main /api/Library response
       }
     }
     
