@@ -154,7 +154,8 @@ export default function SeriesDetailScreen() {
 
   const coverUrl = useMemo(() => {
     if (!detail) return '';
-    const url = provider.getCoverUrl(detail.id) + `?v=${coverKey}`;
+    // Use &v= since getCoverUrl already adds ?seriesId=...&apiKey=...&t=...
+    const url = provider.getCoverUrl(detail.id) + `&v=${coverKey}`;
     console.log(`[SeriesDetail] coverUrl generated: ${url.substring(0, 80)}...`);
     return url;
   }, [detail, provider, coverKey]);
