@@ -45,8 +45,10 @@ export const SeriesCard = React.memo(function SeriesCard({ series, onPress, onCo
   // Memoize coverUrl to prevent regeneration on every render (causes image reload flicker)
   // Include coverVersion in dependencies to force refresh after upload
   const coverUrl = useMemo(() => {
+
     // Pass true for cache busting when coverVersion is set, then append v=
     const baseUrl = provider.getCoverUrl(series.id, !!coverVersion);
+
     // Use &v= since getCoverUrl already has ?seriesId=...&apiKey=...&t=...
     return coverVersion ? `${baseUrl}&v=${coverVersion}` : baseUrl;
   }, [provider, series.id, coverVersion]);
@@ -138,8 +140,10 @@ export const SeriesCardLarge = React.memo(function SeriesCardLarge({ series, onP
   // Memoize coverUrl to prevent regeneration on every render (causes image reload flicker)
   // Include coverVersion in dependencies to force refresh after upload
   const coverUrl = useMemo(() => {
+
     // Pass true for cache busting when coverVersion is set, then append v=
     const baseUrl = provider.getCoverUrl(realId, !!coverVersion);
+
     // Use &v= since getCoverUrl already has ?seriesId=...&apiKey=...&t=...
     return coverVersion ? `${baseUrl}&v=${coverVersion}` : baseUrl;
   }, [provider, realId, coverVersion]);

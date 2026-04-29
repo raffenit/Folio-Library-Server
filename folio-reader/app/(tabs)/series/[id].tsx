@@ -154,6 +154,7 @@ export default function SeriesDetailScreen() {
 
   const coverUrl = useMemo(() => {
     if (!detail) return '';
+    
     // Pass true to enable cache busting with timestamp, then append v= for coverKey
     return provider.getCoverUrl(detail.id, true) + `&v=${coverKey}`;
   }, [detail, provider, coverKey]);
