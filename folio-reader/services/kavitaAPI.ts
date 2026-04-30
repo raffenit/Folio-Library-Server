@@ -730,12 +730,10 @@ class KavitaAPI {
   // ── Cover upload ─────────────────────────────────────────────────────────────
 
   async uploadSeriesCover(seriesId: number, base64DataUrl: string): Promise<void> {
-    // Send full data URL — Kavita's /api/Upload/series endpoint accepts data URLs
-    const url = base64DataUrl;
-    
-    // Debug: log image format and size
-    const format = base64DataUrl.match(/^data:image\/(\w+);/)?.[1] || 'unknown';
-    const sizeKB = Math.round(base64DataUrl.length / 1024);
+    // Extract format and base64 data from data URL
+    const format = base64DataUrl.match(/^data:image\/(\w+);/)?.[1] || 'png';
+    const base64Data = base64DataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const sizeKB = Math.round(base64Data.length / 1024);
     console.log(`[KavitaAPI] Uploading cover for series ${seriesId}: format=${format}, size=${sizeKB}KB`);
     
     // Check series before upload
@@ -750,9 +748,27 @@ class KavitaAPI {
     
     try {
       console.log(`[KavitaAPI] POST /api/Upload/series with JWT: ${this.jwtToken ? 'present' : 'missing'}`);
-      console.log(`[KavitaAPI] Request body: seriesId=${seriesId}, url length=${url.length}, url start=${url.substring(0, 50)}...`);
-      // Try 'seriesId' parameter instead of 'id' - some versions expect this
-      const response = await this.client.post('/api/Upload/series', { seriesId, url });
+      
+      // Convert base64 to binary Blob for file upload
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: `image/${format}` });
+      
+      // Use FormData for multipart file upload
+      const formData = new FormData();
+      formData.append('id', seriesId.toString());
+      formData.append('file', blob, `cover.${format}`);
+      
+      console.log(`[KavitaAPI] Uploading as multipart file: id=${seriesId}, filename=cover.${format}`);
+      const response = await this.client.post('/api/Upload/series', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
       console.log(`[KavitaAPI] Cover upload response: ${response.status}`, JSON.stringify(response.data));
       
       // Wait a moment then check series after upload
