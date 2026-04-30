@@ -738,14 +738,46 @@ class KavitaAPI {
     const sizeKB = Math.round(base64DataUrl.length / 1024);
     console.log(`[KavitaAPI] Uploading cover for series ${seriesId}: format=${format}, size=${sizeKB}KB`);
     
+    // Check series before upload
+    let coverBefore: string | undefined;
+    try {
+      const seriesRes = await this.client.get(`/api/Series/${seriesId}`);
+      coverBefore = seriesRes.data?.coverImage;
+      console.log(`[KavitaAPI] Series ${seriesId} before upload: coverImage=${coverBefore || 'none'}`);
+    } catch (e) {
+      console.log(`[KavitaAPI] Could not get series before upload:`, e);
+    }
+    
     try {
       console.log(`[KavitaAPI] POST /api/Upload/series with JWT: ${this.jwtToken ? 'present' : 'missing'}`);
       console.log(`[KavitaAPI] Request body: id=${seriesId}, url length=${url.length}, url start=${url.substring(0, 50)}...`);
       const response = await this.client.post('/api/Upload/series', { id: seriesId, url });
       console.log(`[KavitaAPI] Cover upload response: ${response.status}`, JSON.stringify(response.data));
-      // Check if response indicates success
-      if (response.data && typeof response.data === 'object') {
-        console.log(`[KavitaAPI] Response keys:`, Object.keys(response.data));
+      
+      // Wait a moment then check series after upload
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        const seriesRes = await this.client.get(`/api/Series/${seriesId}`);
+        const coverAfter = seriesRes.data?.coverImage;
+        console.log(`[KavitaAPI] Series ${seriesId} after upload: coverImage=${coverAfter || 'none'}`);
+        
+        // If coverImage changed, try to force a metadata refresh
+        if (coverBefore !== coverAfter) {
+          console.log(`[KavitaAPI] Cover image path changed, triggering series refresh...`);
+          try {
+            // Try to refresh the series by calling update with minimal data
+            await this.client.post('/api/Series/update', { 
+              id: seriesId, 
+              name: seriesRes.data.name,
+              localizedName: seriesRes.data.localizedName || seriesRes.data.name
+            });
+            console.log(`[KavitaAPI] Series refresh triggered`);
+          } catch (refreshErr) {
+            console.log(`[KavitaAPI] Series refresh failed:`, refreshErr);
+          }
+        }
+      } catch (e) {
+        console.log(`[KavitaAPI] Could not get series after upload:`, e);
       }
     } catch (e: any) {
       console.error(`[KavitaAPI] Cover upload error:`, {
