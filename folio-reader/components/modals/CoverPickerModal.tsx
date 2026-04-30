@@ -142,9 +142,16 @@ export function CoverPickerModal({
     setSearchResults([]);
     setError('');
     try {
-      // Search all providers in parallel and merge results
+      // Search all providers in parallel with individual error handling
       const providerResults = await Promise.all(
-        searchProviders.map(p => p.search(q, 8))
+        searchProviders.map(async (p) => {
+          try {
+            return await p.search(q, 6);
+          } catch (e) {
+            console.warn(`[CoverPicker] Provider ${p.getSourceId()} failed:`, e);
+            return { results: [], warning: `${p.getSourceName()} unavailable` };
+          }
+        })
       );
       
       // Merge all results, filtering for items with covers
@@ -162,12 +169,17 @@ export function CoverPickerModal({
       
       setSearchResults(uniqueResults);
       
-      // Collect any warnings
+      // Collect warnings but don't let them block results
       const warnings = providerResults.map(pr => pr.warning).filter(Boolean);
-      if (warnings.length > 0) {
-        setError(warnings.join('; '));
-      } else if (uniqueResults.length === 0) {
-        setError('No covers found. Try a different search.');
+      if (uniqueResults.length === 0) {
+        // No results at all - show error
+        setError(warnings.length > 0 
+          ? `No covers found. ${warnings.join('; ')}.` 
+          : 'No covers found. Try a different search.'
+        );
+      } else if (warnings.length > 0) {
+        // Got some results but some providers failed - show warning quietly
+        console.log('[CoverPicker] Got results with warnings:', warnings);
       }
     } catch (e: any) {
       setError(`Search failed: ${e?.message ?? 'unknown error'}`);
