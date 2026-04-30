@@ -730,11 +730,8 @@ class KavitaAPI {
   // ── Cover upload ─────────────────────────────────────────────────────────────
 
   async uploadSeriesCover(seriesId: number, base64DataUrl: string): Promise<void> {
-    // Send full data URL — Kavita's /api/Upload/series endpoint accepts data URLs
-    const url = base64DataUrl;
-    
-    // Debug: log image format and size
-    const format = base64DataUrl.match(/^data:image\/(\w+);/)?.[1] || 'unknown';
+    // Log upload details
+    const format = base64DataUrl.match(/^data:image\/(\w+);/)?.[1] || 'png';
     const sizeKB = Math.round(base64DataUrl.length / 1024);
     console.log(`[KavitaAPI] Uploading cover for series ${seriesId}: format=${format}, size=${sizeKB}KB`);
     
@@ -750,9 +747,15 @@ class KavitaAPI {
     
     try {
       console.log(`[KavitaAPI] POST /api/Upload/series with JWT: ${this.jwtToken ? 'present' : 'missing'}`);
-      console.log(`[KavitaAPI] Request body: seriesId=${seriesId}, url length=${url.length}, url start=${url.substring(0, 50)}...`);
-      // Try 'seriesId' parameter instead of 'id' - some versions expect this
-      const response = await this.client.post('/api/Upload/series', { seriesId, url });
+      
+      // Send as JSON with fromBase64 flag - tells Kavita the URL is base64 data, not a remote URL
+      // Based on Kavita source code: UploadFileDto has id, url, and fromBase64 fields
+      const response = await this.client.post('/api/Upload/series', { 
+        id: seriesId, 
+        url: base64DataUrl,
+        fromBase64: true 
+      });
+
       console.log(`[KavitaAPI] Cover upload response: ${response.status}`, JSON.stringify(response.data));
       
       // Wait a moment then check series after upload
