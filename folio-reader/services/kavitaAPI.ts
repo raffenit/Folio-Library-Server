@@ -750,12 +750,30 @@ class KavitaAPI {
     
     try {
       console.log(`[KavitaAPI] POST /api/Upload/series with JWT: ${this.jwtToken ? 'present' : 'missing'}`);
-      console.log(`[KavitaAPI] Request body: id=${seriesId}, url length=${url.length}, url start=${url.substring(0, 50)}...`);
-      const response = await this.client.post('/api/Upload/series', { id: seriesId, url });
+      console.log(`[KavitaAPI] Request body: seriesId=${seriesId}, url length=${url.length}, url start=${url.substring(0, 50)}...`);
+      // Try 'seriesId' parameter instead of 'id' - some versions expect this
+      const response = await this.client.post('/api/Upload/series', { seriesId, url });
       console.log(`[KavitaAPI] Cover upload response: ${response.status}`, JSON.stringify(response.data));
       
       // Wait a moment then check series after upload
       await new Promise(r => setTimeout(r, 500));
+      
+      // Try to trigger a library scan to process the new cover
+      try {
+        const seriesRes = await this.client.get(`/api/Series/${seriesId}`);
+        const libraryId = seriesRes.data?.libraryId;
+        if (libraryId) {
+          console.log(`[KavitaAPI] Triggering library scan for library ${libraryId}...`);
+          await this.scanLibrary(libraryId);
+          console.log(`[KavitaAPI] Library scan triggered`);
+          
+          // Wait for scan to process
+          await new Promise(r => setTimeout(r, 2000));
+        }
+      } catch (scanErr) {
+        console.log(`[KavitaAPI] Library scan failed:`, scanErr);
+      }
+
       try {
         const seriesRes = await this.client.get(`/api/Series/${seriesId}`);
         const coverAfter = seriesRes.data?.coverImage;
