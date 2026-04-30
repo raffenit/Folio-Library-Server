@@ -1,4 +1,5 @@
 import { SearchProvider, SearchMetadataResult } from './SearchProvider';
+import { proxyUrl } from '@/config/proxy';
 
 /**
  * Audible Search Provider
@@ -21,7 +22,7 @@ export class AudibleSearchProvider implements SearchProvider {
     
     try {
       // Note: We use the local proxy to bypass CORS
-      const res = await fetch(`/openlibrary-proxy?url=${encodeURIComponent(url)}`);
+      const res = await fetch(proxyUrl(url));
       
       if (!res.ok) {
         return { 
@@ -47,7 +48,7 @@ export class AudibleSearchProvider implements SearchProvider {
           publisher: item.publisher || undefined,
           description: item.description || undefined,
           // Use the proxy for the cover URL to avoid CORS issues
-          coverUrl: coverUrl ? `/openlibrary-proxy?url=${encodeURIComponent(coverUrl)}` : undefined,
+          coverUrl: coverUrl ? proxyUrl(coverUrl) : undefined,
           coverUploadUrl: coverUrl,
         };
       });

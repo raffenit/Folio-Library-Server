@@ -62,6 +62,49 @@ GET /api/endpoint?apiKey=YOUR_API_KEY
 | `GET /api/Series/metadata` | JWT header | ✓ Working |
 | `POST /api/Series/metadata/update` | JWT header | ✓ Working |
 
+### Cover Upload API (`POST /api/Upload/series`)
+
+**Endpoint:** `POST /api/Upload/series`  
+**Authentication:** JWT Bearer token (Authorization header)  
+**Content-Type:** `application/json`
+
+**Request Body Structure:**
+```json
+{
+  "id": 95,
+  "url": "iVBORw0KGgoAAAANS...",
+  "fromBase64": true
+}
+```
+
+**Critical Requirements:**
+
+1. **Parameter Name:** Must use `id`, NOT `seriesId` (returns 400 Bad Request otherwise)
+2. **fromBase64 Flag:** Must be `true` when sending base64-encoded image data
+3. **URL Field Format:** When `fromBase64: true`, the `url` field must contain **only** the raw base64 data
+   - ✅ Correct: `"url": "iVBORw0KGgoAAAANS..."`
+   - ❌ Incorrect: `"url": "data:image/png;base64,iVBORw0KGgoAAAANS..."`
+
+**Example Flow:**
+```typescript
+// 1. Get base64 data URL from image picker (includes prefix)
+const base64DataUrl = "data:image/png;base64,iVBORw0KGgoAAAANS...";
+
+// 2. Strip the data URL prefix for Kavita
+const base64Data = base64DataUrl.replace(/^data:image\/\w+;base64,/, '');
+
+// 3. Send upload request
+await axios.post('/api/Upload/series', {
+  id: seriesId,           // NOT seriesId
+  url: base64Data,        // Raw base64 only, no prefix
+  fromBase64: true        // Required flag
+});
+```
+
+**Response:** `200 OK` with empty body `""` on success
+
+**Note:** The upload returns 200 even if the cover processing fails. Check the series metadata afterward to confirm the cover was saved.
+
 ### Image Endpoints (Require apiKey Param)
 
 | Endpoint | Auth Method | Status |
@@ -176,6 +219,7 @@ curl -I http://100.104.199.67:8050/api/image/series-cover?seriesId=1 \
 | 2026-04-27 | Fixed cover URLs to use apiKey | - |
 | 2026-04-27 | Fixed volumes array type checking | - |
 | 2026-04-27 | **Confirmed:** Image endpoints work with `?apiKey=` param (direct browser test) | - |
+| 2026-04-29 | **Fixed:** Series cover upload - use `id` param, `fromBase64: true`, and strip data URL prefix | - |
 
 ---
 

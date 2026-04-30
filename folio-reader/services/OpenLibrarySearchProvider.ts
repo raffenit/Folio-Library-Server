@@ -1,4 +1,5 @@
 import { SearchProvider, SearchMetadataResult } from './SearchProvider';
+import { proxyUrl } from '@/config/proxy';
 
 export class OpenLibrarySearchProvider implements SearchProvider {
   getSourceName(): string {
@@ -13,7 +14,7 @@ export class OpenLibrarySearchProvider implements SearchProvider {
     const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(query)}&limit=${limit}`;
     try {
       // Note: We use the local proxy to bypass CORS
-      const res = await fetch(`/openlibrary-proxy?url=${encodeURIComponent(url)}`);
+      const res = await fetch(proxyUrl(url));
       
       if (!res.ok) {
         return { 
@@ -36,7 +37,7 @@ export class OpenLibrarySearchProvider implements SearchProvider {
           year: doc.first_publish_year,
           genres: (doc.subject ?? []).slice(0, 5),
           publisher: doc.publisher?.[0],
-          coverUrl: thumb ? `/openlibrary-proxy?url=${encodeURIComponent(thumb)}` : undefined,
+          coverUrl: thumb ? proxyUrl(thumb) : undefined,
           coverUploadUrl: thumb,
         };
       });
