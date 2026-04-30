@@ -747,10 +747,10 @@ class KavitaAPI {
     
     try {
       console.log(`[KavitaAPI] POST /api/Upload/series with JWT: ${this.jwtToken ? 'present' : 'missing'}`);
-      
+   
       // When fromBase64 is true, Kavita expects just the base64 data without the data URL prefix
       const base64Data = base64DataUrl.replace(/^data:image\/\w+;base64,/, '');
-      
+
       // Send as JSON with fromBase64 flag - tells Kavita the URL is base64 data, not a remote URL
       // Based on Kavita source code: UploadFileDto has id, url, and fromBase64 fields
       const response = await this.client.post('/api/Upload/series', { 
