@@ -758,6 +758,7 @@ class KavitaAPI {
         url: base64Data,
         fromBase64: true 
       });
+
       console.log(`[KavitaAPI] Cover upload response: ${response.status}`, JSON.stringify(response.data));
       
       // Wait a moment then check series after upload
