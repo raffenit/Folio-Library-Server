@@ -773,7 +773,7 @@ class KavitaAPI {
       } catch (scanErr) {
         console.log(`[KavitaAPI] Library scan failed:`, scanErr);
       }
-      
+
       try {
         const seriesRes = await this.client.get(`/api/Series/${seriesId}`);
         const coverAfter = seriesRes.data?.coverImage;
