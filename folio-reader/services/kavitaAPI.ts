@@ -730,10 +730,9 @@ class KavitaAPI {
   // ── Cover upload ─────────────────────────────────────────────────────────────
 
   async uploadSeriesCover(seriesId: number, base64DataUrl: string): Promise<void> {
-    // Extract format and base64 data from data URL
+    // Log upload details
     const format = base64DataUrl.match(/^data:image\/(\w+);/)?.[1] || 'png';
-    const base64Data = base64DataUrl.replace(/^data:image\/\w+;base64,/, '');
-    const sizeKB = Math.round(base64Data.length / 1024);
+    const sizeKB = Math.round(base64DataUrl.length / 1024);
     console.log(`[KavitaAPI] Uploading cover for series ${seriesId}: format=${format}, size=${sizeKB}KB`);
     
     // Check series before upload
@@ -749,25 +748,12 @@ class KavitaAPI {
     try {
       console.log(`[KavitaAPI] POST /api/Upload/series with JWT: ${this.jwtToken ? 'present' : 'missing'}`);
       
-      // Convert base64 to binary Blob for file upload
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: `image/${format}` });
-      
-      // Use FormData for multipart file upload
-      const formData = new FormData();
-      formData.append('id', seriesId.toString());
-      formData.append('file', blob, `cover.${format}`);
-      
-      console.log(`[KavitaAPI] Uploading as multipart file: id=${seriesId}, filename=cover.${format}`);
-      const response = await this.client.post('/api/Upload/series', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      // Send as JSON with fromBase64 flag - tells Kavita the URL is base64 data, not a remote URL
+      // Based on Kavita source code: UploadFileDto has id, url, and fromBase64 fields
+      const response = await this.client.post('/api/Upload/series', { 
+        id: seriesId, 
+        url: base64DataUrl,
+        fromBase64: true 
       });
       console.log(`[KavitaAPI] Cover upload response: ${response.status}`, JSON.stringify(response.data));
       
