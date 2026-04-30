@@ -54,7 +54,10 @@ export function CoverPickerModal({
   const [error, setError] = useState('');
 
   const provider = LibraryFactory.getProvider(providerType);
-  const searchProvider = SearchFactory.getProvider('openlibrary');
+  // Use audiobook-specific providers for ABS, all providers for Kavita
+  const searchProviders = providerType === 'abs'
+    ? SearchFactory.getAudiobookProviders()  // Audible + Google Books
+    : SearchFactory.getAllProviders();        // Google Books + Open Library + Audible
 
   useEffect(() => {
     if (visible) {
@@ -139,11 +142,33 @@ export function CoverPickerModal({
     setSearchResults([]);
     setError('');
     try {
-      const { results, warning } = await searchProvider.search(q, 12);
-      const withCovers = results.filter(r => r.coverUploadUrl);
-      setSearchResults(withCovers);
-      if (warning) setError(warning);
-      if (withCovers.length === 0 && !warning) setError('No covers found. Try a different search.');
+      // Search all providers in parallel and merge results
+      const providerResults = await Promise.all(
+        searchProviders.map(p => p.search(q, 8))
+      );
+      
+      // Merge all results, filtering for items with covers
+      const allResults = providerResults.flatMap(pr => pr.results).filter(r => r.coverUploadUrl);
+      
+      // Deduplicate by cover URL (same image from different sources)
+      const seenUrls = new Set<string>();
+      const uniqueResults = allResults.filter(r => {
+        if (!r.coverUploadUrl) return false;
+        const normalized = r.coverUploadUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        if (seenUrls.has(normalized)) return false;
+        seenUrls.add(normalized);
+        return true;
+      });
+      
+      setSearchResults(uniqueResults);
+      
+      // Collect any warnings
+      const warnings = providerResults.map(pr => pr.warning).filter(Boolean);
+      if (warnings.length > 0) {
+        setError(warnings.join('; '));
+      } else if (uniqueResults.length === 0) {
+        setError('No covers found. Try a different search.');
+      }
     } catch (e: any) {
       setError(`Search failed: ${e?.message ?? 'unknown error'}`);
     } finally {
@@ -174,7 +199,7 @@ export function CoverPickerModal({
             <TouchableOpacity style={styles.coverOptionBtn} onPress={() => { setMode('search'); }} activeOpacity={0.8}>
               <Ionicons name="search-outline" size={28} color={Colors.accent} />
               <Text style={styles.coverOptionText}>Search online</Text>
-              <Text style={styles.coverOptionSub}>Find covers from Open Library</Text>
+              <Text style={styles.coverOptionSub}>Find covers from Google Books{providerType === 'abs' ? ', Audible' : ', Open Library, Audible'}</Text>
             </TouchableOpacity>
             {uploading && <ActivityIndicator color={Colors.accent} style={{ marginTop: Spacing.lg }} />}
             {error ? <Text style={styles.coverError}>{error}</Text> : null}
