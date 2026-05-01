@@ -239,7 +239,12 @@ class KavitaAPI {
         config.baseURL = '';
         config.params = undefined;
         if (this.jwtToken) {
+          // Ensure headers object exists before setting Authorization
+          config.headers = config.headers || {};
           config.headers.Authorization = `Bearer ${this.jwtToken}`;
+          if (__DEV__) {
+            console.log(`[Kavita Proxy] Added JWT auth header`);
+          }
         }
         return config;
       }
@@ -427,7 +432,13 @@ class KavitaAPI {
   async getLibraries(): Promise<Library[]> {
     // Try /api/Library first (standard endpoint)
     // Authentication is handled by the request interceptor (JWT header or API key param)
-    let response = await this.client.get('/api/Library');
+    let response;
+    try {
+      response = await this.client.get('/api/Library');
+    } catch (error: any) {
+      console.warn('[KavitaAPI] /api/Library failed:', error.response?.status, error.message);
+      response = { data: [] };
+    }
     
     // If 204/empty, try /api/Library/all
     if (!Array.isArray(response.data) || response.data.length === 0) {
@@ -436,9 +447,10 @@ class KavitaAPI {
         if (Array.isArray(allResponse.data) && allResponse.data.length > 0) {
           response = allResponse;
         }
-      } catch {
+      } catch (error: any) {
         // /api/Library/all failed (404 or other error) - this is expected in Kavita v2
         // The endpoint doesn't exist, we gracefully fall back to the main /api/Library response
+        console.warn('[KavitaAPI] /api/Library/all failed:', error.response?.status, error.message);
       }
     }
     
