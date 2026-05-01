@@ -242,9 +242,11 @@ class KavitaAPI {
           // Ensure headers object exists before setting Authorization
           config.headers = config.headers || {};
           config.headers.Authorization = `Bearer ${this.jwtToken}`;
-          if (__DEV__) {
-            console.log(`[Kavita Proxy] Added JWT auth header`);
-          }
+          console.log(`[Kavita Proxy] Added JWT auth header: Bearer ${this.jwtToken.substring(0, 20)}...`);
+        } else if (this.apiKey) {
+          console.log('[Kavita Proxy] No JWT, using API key as param');
+        } else {
+          console.warn('[Kavita Proxy] No JWT or API key - request may fail');
         }
         return config;
       }
@@ -281,6 +283,8 @@ class KavitaAPI {
       const storedPassword = await credentials.kavita.getPassword();
       this.progressTrackingEnabled = await credentials.kavita.isProgressTrackingEnabled();
 
+      console.log('[KavitaAPI] Initialize - URL:', storedUrl ? 'set' : 'missing', 'User:', storedUsername ? 'set' : 'missing');
+
       if (storedUrl) {
         this.setServer(storedUrl, storedKey || '');
 
@@ -290,6 +294,7 @@ class KavitaAPI {
 
         // Try to load JWT token (profile-specific)
         const storedJwt = await credentials.kavita.getJwtToken();
+        console.log('[KavitaAPI] Initialize - JWT:', storedJwt ? `present (${storedJwt.substring(0, 20)}...)` : 'missing');
         if (storedJwt) {
           this.jwtToken = storedJwt;
           this.client.defaults.headers.common['Authorization'] = `Bearer ${this.jwtToken}`;
@@ -430,11 +435,15 @@ class KavitaAPI {
   // ── Libraries ───────────────────────────────────────────────────────────────
 
   async getLibraries(): Promise<Library[]> {
+    console.log('[KavitaAPI] getLibraries() called. JWT:', !!this.jwtToken, 'APIKey:', !!this.apiKey);
+    
     // Try /api/Library first (standard endpoint)
     // Authentication is handled by the request interceptor (JWT header or API key param)
     let response;
     try {
+      console.log('[KavitaAPI] Trying /api/Library...');
       response = await this.client.get('/api/Library');
+      console.log('[KavitaAPI] /api/Library response:', response.status, Array.isArray(response.data) ? `${response.data.length} items` : typeof response.data);
     } catch (error: any) {
       console.warn('[KavitaAPI] /api/Library failed:', error.response?.status, error.message);
       response = { data: [] };
@@ -442,8 +451,10 @@ class KavitaAPI {
     
     // If 204/empty, try /api/Library/all
     if (!Array.isArray(response.data) || response.data.length === 0) {
+      console.log('[KavitaAPI] Trying fallback /api/Library/all...');
       try {
         const allResponse = await this.client.get('/api/Library/all');
+        console.log('[KavitaAPI] /api/Library/all response:', allResponse.status);
         if (Array.isArray(allResponse.data) && allResponse.data.length > 0) {
           response = allResponse;
         }
@@ -454,14 +465,18 @@ class KavitaAPI {
       }
     }
     
-    // Final fallback: extract unique libraries from /api/Series/all (which we know works)
+    // Final fallback: extract unique libraries from /api/Series/all
     if (!Array.isArray(response.data) || response.data.length === 0) {
+      console.log('[KavitaAPI] Trying fallback extraction from /api/Series/all...');
       try {
-        // Note: /api/Series/all requires POST, not GET
+        // Try minimal POST to get all series without filters
         const seriesResponse = await this.client.post('/api/Series/all', {
-          apiKey: this.apiKey
+          pageNumber: 0,
+          pageSize: 1000
         });
-        if (Array.isArray(seriesResponse.data)) {
+        console.log('[KavitaAPI] /api/Series/all response:', seriesResponse.status, Array.isArray(seriesResponse.data) ? `${seriesResponse.data.length} items` : typeof seriesResponse.data);
+        
+        if (Array.isArray(seriesResponse.data) && seriesResponse.data.length > 0) {
           // Extract unique libraries from series data
           const libraryMap = new Map<number, Library>();
           seriesResponse.data.forEach((series: any) => {
@@ -475,17 +490,20 @@ class KavitaAPI {
             }
           });
           const extractedLibraries = Array.from(libraryMap.values());
+          console.log('[KavitaAPI] Extracted libraries from series:', extractedLibraries.length);
           return extractedLibraries;
         }
-      } catch {
-        // Series fallback failed
+      } catch (error: any) {
+        console.error('[KavitaAPI] Series fallback failed:', error.response?.status, error.message);
       }
     }
     
     // Handle 204 No Content or non-array responses
     if (!Array.isArray(response.data)) {
+      console.warn('[KavitaAPI] Final response is not an array:', typeof response.data);
       return [];
     }
+    console.log('[KavitaAPI] Returning libraries:', response.data.length);
     return response.data;
   }
 
@@ -506,10 +524,12 @@ class KavitaAPI {
   async getAllSeries(page = 0, pageSize = 30): Promise<Series[]> {
     // Kavita API requires a library context for /api/Series/all
     // So we first get all libraries, then fetch series from each
+    console.log('[KavitaAPI] getAllSeries() called. JWT:', !!this.jwtToken, 'APIKey:', !!this.apiKey);
     try {
       const libraries = await this.getLibraries();
+      console.log('[KavitaAPI] getLibraries returned:', libraries ? `${libraries.length} libraries` : 'null');
       if (!libraries || libraries.length === 0) {
-        console.warn('[KavitaAPI] No libraries found');
+        console.warn('[KavitaAPI] No libraries found - cannot fetch series');
         return [];
       }
 
@@ -521,6 +541,7 @@ class KavitaAPI {
         pageNumber: page,
         pageSize,
       });
+      console.log('[KavitaAPI] /api/Series/all response:', response.status, Array.isArray(response.data) ? `${response.data.length} series` : typeof response.data);
 
       return response.data || [];
     } catch (error: any) {

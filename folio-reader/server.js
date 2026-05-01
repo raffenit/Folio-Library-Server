@@ -75,6 +75,7 @@ function handleProxy(req, res) {
   }
 
   console.log(`[Proxy] ${req.method} ${targetUrl}`);
+  console.log(`[Proxy] Incoming headers:`, JSON.stringify(req.headers, null, 2));
 
   const target = url.parse(targetUrl);
   const isHttps = target.protocol === 'https:';
@@ -96,6 +97,8 @@ function handleProxy(req, res) {
   delete options.headers['connection'];
   delete options.headers['origin'];
   delete options.headers['referer'];
+  
+  console.log(`[Proxy] Outgoing headers to target:`, JSON.stringify(options.headers, null, 2));
 
   const proxyReq = transport.request(options, (proxyRes) => {
     // Add CORS headers
