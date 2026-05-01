@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import { Platform } from 'react-native';
+import { KAVITA_ENDPOINTS, tryEndpoints } from '../config/kavitaEndpoints';
 import { storage } from './storage';
 import { PROXY_PATH, isProxied, extractTargetUrl } from '@/config/proxy';
 import { credentials, STORAGE_KEYS } from '@/config/credentials';
@@ -437,111 +438,86 @@ class KavitaAPI {
   async getLibraries(): Promise<Library[]> {
     console.log('[KavitaAPI] getLibraries() called. JWT:', !!this.jwtToken, 'APIKey:', !!this.apiKey);
     
-    let response;
-    
-    // Try /api/v2/library (Kavita v2 API style)
-    try {
-      console.log('[KavitaAPI] Trying /api/v2/library...');
-      response = await this.client.get('/api/v2/library');
-      console.log('[KavitaAPI] /api/v2/library response:', response.status, Array.isArray(response.data) ? `${response.data.length} items` : typeof response.data);
-    } catch (error: any) {
-      console.warn('[KavitaAPI] /api/v2/library failed:', error.response?.status, error.message);
-      response = { data: [] };
-    }
-    
-    // Try /api/library (lowercase - Kavita 0.8.x style)
-    if (!Array.isArray(response.data) || response.data.length === 0) {
+    // Try standard library endpoints in order
+    for (const endpoint of KAVITA_ENDPOINTS.libraries) {
       try {
-        console.log('[KavitaAPI] Trying /api/library (lowercase)...');
-        response = await this.client.get('/api/library');
-        console.log('[KavitaAPI] /api/library response:', response.status, Array.isArray(response.data) ? `${response.data.length} items` : typeof response.data);
-      } catch (error: any) {
-        console.warn('[KavitaAPI] /api/library failed:', error.response?.status, error.message);
-        response = { data: [] };
-      }
-    }
-    
-    // Try /api/Library (capitalized - older style)
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      try {
-        console.log('[KavitaAPI] Trying /api/Library (capitalized)...');
-        response = await this.client.get('/api/Library');
-        console.log('[KavitaAPI] /api/Library response:', response.status, Array.isArray(response.data) ? `${response.data.length} items` : typeof response.data);
-      } catch (error: any) {
-        console.warn('[KavitaAPI] /api/Library failed:', error.response?.status, error.message);
-        response = { data: [] };
-      }
-    }
-    
-    // Try /api/Library/all
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      console.log('[KavitaAPI] Trying fallback /api/Library/all...');
-      try {
-        const allResponse = await this.client.get('/api/Library/all');
-        console.log('[KavitaAPI] /api/Library/all response:', allResponse.status);
-        if (Array.isArray(allResponse.data) && allResponse.data.length > 0) {
-          response = allResponse;
-        }
-      } catch (error: any) {
-        console.warn('[KavitaAPI] /api/Library/all failed:', error.response?.status, error.message);
-      }
-    }
-    
-    // Try using on-deck endpoint to discover libraries (we know this works)
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      console.log('[KavitaAPI] Trying to discover libraries from /api/Series/on-deck...');
-      try {
-        const onDeckResponse = await this.client.post('/api/Series/on-deck', {
-          pageNumber: 1,
-          pageSize: 100,
-          libraryId: 0
-        });
-        console.log('[KavitaAPI] /api/Series/on-deck response:', onDeckResponse.status, Array.isArray(onDeckResponse.data) ? `${onDeckResponse.data.length} items` : typeof onDeckResponse.data);
+        console.log(`[KavitaAPI] Trying ${endpoint}...`);
+        const response = await this.client.get(endpoint);
+        console.log(`[KavitaAPI] ${endpoint} response:`, response.status, 
+          Array.isArray(response.data) ? `${response.data.length} items` : typeof response.data);
         
-        if (Array.isArray(onDeckResponse.data) && onDeckResponse.data.length > 0) {
-          const libraryMap = new Map<number, Library>();
-          onDeckResponse.data.forEach((series: any) => {
-            if (series.libraryId && !libraryMap.has(series.libraryId)) {
-              libraryMap.set(series.libraryId, {
-                id: series.libraryId,
-                name: series.libraryName || `Library ${series.libraryId}`,
-                type: typeof series.libraryType === 'number' ? series.libraryType : 0,
-                series: 0
-              });
-            }
-          });
-          const extractedLibraries = Array.from(libraryMap.values());
-          if (extractedLibraries.length > 0) {
-            console.log('[KavitaAPI] Extracted libraries from on-deck:', extractedLibraries.length);
-            return extractedLibraries;
-          }
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          console.log('[KavitaAPI] Returning libraries:', response.data.length);
+          return response.data;
         }
       } catch (error: any) {
-        console.warn('[KavitaAPI] on-deck library discovery failed:', error.response?.status, error.message);
+        console.warn(`[KavitaAPI] ${endpoint} failed:`, error.response?.status, error.message);
       }
     }
     
-    // Handle 204 No Content or non-array responses
-    if (!Array.isArray(response.data)) {
-      console.warn('[KavitaAPI] Final response is not an array:', typeof response.data);
-      return [];
+    // Fallback: discover libraries from on-deck series
+    try {
+      console.log(`[KavitaAPI] Trying fallback ${KAVITA_ENDPOINTS.onDeck}...`);
+      const response = await this.client.post(KAVITA_ENDPOINTS.onDeck, {
+        pageNumber: 1,
+        pageSize: 100,
+        libraryId: 0
+      });
+      console.log(`[KavitaAPI] ${KAVITA_ENDPOINTS.onDeck} response:`, response.status, 
+        Array.isArray(response.data) ? `${response.data.length} items` : typeof response.data);
+      
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        const libraryMap = new Map<number, Library>();
+        response.data.forEach((series: any) => {
+          if (series.libraryId && !libraryMap.has(series.libraryId)) {
+            libraryMap.set(series.libraryId, {
+              id: series.libraryId,
+              name: series.libraryName || `Library ${series.libraryId}`,
+              type: typeof series.libraryType === 'number' ? series.libraryType : 0,
+              series: 0
+            });
+          }
+        });
+        const extractedLibraries = Array.from(libraryMap.values());
+        if (extractedLibraries.length > 0) {
+          console.log('[KavitaAPI] Extracted libraries from on-deck:', extractedLibraries.length);
+          return extractedLibraries;
+        }
+      }
+    } catch (error: any) {
+      console.warn(`[KavitaAPI] ${KAVITA_ENDPOINTS.onDeck} failed:`, error.response?.status, error.message);
     }
-    console.log('[KavitaAPI] Returning libraries:', response.data.length);
-    return response.data;
+    
+    console.warn('[KavitaAPI] All library endpoints failed');
+    return [];
   }
 
   // ── Series ──────────────────────────────────────────────────────────────────
 
   async getSeriesForLibrary(libraryId: number, page = 0, pageSize = 30): Promise<Series[]> {
-    // Kavita v0.7+ uses `libraries` (array); older versions use `libraryId` (scalar).
-    // Send both so we work with either version.
-    const response = await this.client.post('/api/Series/all', {
-      libraries: [libraryId],
-      libraryId,
-      pageNumber: page,
-      pageSize,
-    });
-    return response.data;
+    console.log(`[KavitaAPI] getSeriesForLibrary(${libraryId}) called`);
+    
+    // Try series endpoints for specific library
+    for (const endpoint of KAVITA_ENDPOINTS.series.byLibrary) {
+      try {
+        console.log(`[KavitaAPI] Trying ${endpoint} for library ${libraryId}...`);
+        const response = await this.client.post(endpoint, {
+          libraryId,
+          pageNumber: page,
+          pageSize,
+        });
+        console.log(`[KavitaAPI] ${endpoint} response:`, response.status, 
+          Array.isArray(response.data) ? `${response.data.length} series` : typeof response.data);
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+      } catch (error: any) {
+        console.warn(`[KavitaAPI] ${endpoint} failed:`, error.response?.status, error.message);
+      }
+    }
+    
+    console.error(`[KavitaAPI] All series endpoints failed for library ${libraryId}`);
+    return [];
   }
 
   async getAllSeries(page = 0, pageSize = 30): Promise<Series[]> {
@@ -559,89 +535,46 @@ class KavitaAPI {
       const libraryIds = libraries.map(l => l.id);
       console.log(`[KavitaAPI] Fetching series from ${libraryIds.length} libraries:`, libraryIds);
 
-      // Try v2 endpoint first (Kavita v2 API style)
-      try {
-        console.log('[KavitaAPI] Trying /api/v2/series...');
-        const response = await this.client.post('/api/v2/series', {
-          libraries: libraryIds,
-          pageNumber: page,
-          pageSize,
-        });
-        console.log('[KavitaAPI] /api/v2/series response:', response.status, Array.isArray(response.data) ? `${response.data.length} series` : typeof response.data);
-        if (Array.isArray(response.data)) {
-          return response.data;
+      // Try series endpoints for all libraries
+      for (const endpoint of KAVITA_ENDPOINTS.series.all) {
+        try {
+          console.log(`[KavitaAPI] Trying ${endpoint}...`);
+          const response = await this.client.post(endpoint, {
+            libraries: libraryIds,
+            pageNumber: page,
+            pageSize,
+          });
+          console.log(`[KavitaAPI] ${endpoint} response:`, response.status, 
+            Array.isArray(response.data) ? `${response.data.length} series` : typeof response.data);
+          if (Array.isArray(response.data)) {
+            return response.data;
+          }
+        } catch (error: any) {
+          console.warn(`[KavitaAPI] ${endpoint} failed:`, error.response?.status, error.message);
         }
-      } catch (error: any) {
-        console.warn('[KavitaAPI] /api/v2/series failed:', error.response?.status, error.message);
-      }
-
-      // Try lowercase endpoint (Kavita 0.8.x style)
-      try {
-        console.log('[KavitaAPI] Trying /api/series/all (lowercase)...');
-        const response = await this.client.post('/api/series/all', {
-          libraries: libraryIds,
-          pageNumber: page,
-          pageSize,
-        });
-        console.log('[KavitaAPI] /api/series/all response:', response.status, Array.isArray(response.data) ? `${response.data.length} series` : typeof response.data);
-        if (Array.isArray(response.data)) {
-          return response.data;
-        }
-      } catch (error: any) {
-        console.warn('[KavitaAPI] /api/series/all failed:', error.response?.status, error.message);
-      }
-
-      // Try capitalized endpoint (older style)
-      try {
-        console.log('[KavitaAPI] Trying /api/Series/all (capitalized)...');
-        const response = await this.client.post('/api/Series/all', {
-          libraries: libraryIds,
-          pageNumber: page,
-          pageSize,
-        });
-        console.log('[KavitaAPI] /api/Series/all response:', response.status, Array.isArray(response.data) ? `${response.data.length} series` : typeof response.data);
-        if (Array.isArray(response.data)) {
-          return response.data;
-        }
-      } catch (error: any) {
-        console.warn('[KavitaAPI] /api/Series/all failed:', error.response?.status, error.message);
       }
 
       // Fallback: fetch series for each library individually
       console.log('[KavitaAPI] Falling back to per-library series fetching...');
       const allSeries: Series[] = [];
       for (const library of libraries) {
-        // Try v2 endpoint first for per-library fetch
-        try {
-          console.log(`[KavitaAPI] Fetching series for library ${library.id} from v2...`);
-          const response = await this.client.post('/api/v2/series', {
-            libraryId: library.id,
-            pageNumber: page,
-            pageSize,
-          });
-          if (Array.isArray(response.data)) {
-            console.log(`[KavitaAPI] Library ${library.id} (v2): ${response.data.length} series`);
-            allSeries.push(...response.data);
-            continue; // Success, move to next library
+        // Try each endpoint for this library
+        for (const endpoint of KAVITA_ENDPOINTS.series.byLibrary) {
+          try {
+            console.log(`[KavitaAPI] Fetching series for library ${library.id} from ${endpoint}...`);
+            const response = await this.client.post(endpoint, {
+              libraryId: library.id,
+              pageNumber: page,
+              pageSize,
+            });
+            if (Array.isArray(response.data)) {
+              console.log(`[KavitaAPI] Library ${library.id} (${endpoint}): ${response.data.length} series`);
+              allSeries.push(...response.data);
+              break; // Success, move to next library
+            }
+          } catch (error: any) {
+            console.warn(`[KavitaAPI] Library ${library.id} ${endpoint} failed:`, error.response?.status);
           }
-        } catch (error: any) {
-          console.warn(`[KavitaAPI] Library ${library.id} v2 failed:`, error.response?.status);
-        }
-        
-        // Fallback to v1 endpoint
-        try {
-          console.log(`[KavitaAPI] Fetching series for library ${library.id} from v1...`);
-          const response = await this.client.post('/api/Series/all', {
-            libraryId: library.id,
-            pageNumber: page,
-            pageSize,
-          });
-          if (Array.isArray(response.data)) {
-            console.log(`[KavitaAPI] Library ${library.id} (v1): ${response.data.length} series`);
-            allSeries.push(...response.data);
-          }
-        } catch (error: any) {
-          console.warn(`[KavitaAPI] Failed to fetch series for library ${library.id}:`, error.response?.status);
         }
       }
       
