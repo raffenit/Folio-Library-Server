@@ -107,15 +107,7 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
       setStatus('');
       setDiscoveredServers([]);
       setManualMode(false);
-      // Auto-start quick scan
-      quickDiscover().then(servers => {
-        const kavitaServers = servers.filter(s => s.type === 'kavita');
-        setDiscoveredServers(kavitaServers);
-        if (kavitaServers.length === 0) {
-          // No quick discoveries, try full network scan
-          runFullDiscovery();
-        }
-      });
+      // Auto-scan disabled - user can manually trigger if needed
     }
   }, [visible]);
 
