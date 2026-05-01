@@ -492,11 +492,29 @@ class KavitaAPI {
   }
 
   async getAllSeries(page = 0, pageSize = 30): Promise<Series[]> {
-    const response = await this.client.post('/api/Series/all', {
-      pageNumber: page,
-      pageSize,
-    });
-    return response.data;
+    // Kavita API requires a library context for /api/Series/all
+    // So we first get all libraries, then fetch series from each
+    try {
+      const libraries = await this.getLibraries();
+      if (!libraries || libraries.length === 0) {
+        console.warn('[KavitaAPI] No libraries found');
+        return [];
+      }
+
+      const libraryIds = libraries.map(l => l.id);
+      console.log(`[KavitaAPI] Fetching series from ${libraryIds.length} libraries:`, libraryIds);
+
+      const response = await this.client.post('/api/Series/all', {
+        libraries: libraryIds,
+        pageNumber: page,
+        pageSize,
+      });
+
+      return response.data || [];
+    } catch (error: any) {
+      console.error('[KavitaAPI] getAllSeries failed:', error.response?.status, error.message);
+      return [];
+    }
   }
 
   async updateSeries(series: Partial<Series> & { id: number; [key: string]: any }): Promise<void> {
