@@ -51,6 +51,7 @@ export default function AudiobooksScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Filter states
   const [genres, setGenres] = useState<FilterItem[]>([]);
@@ -231,25 +232,25 @@ export default function AudiobooksScreen() {
     setLoading(true);
     const provider = LibraryFactory.getProvider('abs');
     await provider.initialize();
-    
+
     const isAuth = await provider.isAuthenticated();
     if (!isAuth) {
       setConnected(false);
       setLoading(false);
       return;
     }
-    
+
     setConnected(true);
     try {
       // Libraries are still ABS specific for this tab's picker
       const { absAPI } = await import('../../services/audiobookshelfAPI');
       const libs = await absAPI.getLibraries();
       setLibraries(libs);
-      
-      const currentLib = selectedLibraryId && libs.some(l => l.id === selectedLibraryId) 
-        ? selectedLibraryId 
+
+      const currentLib = selectedLibraryId && libs.some(l => l.id === selectedLibraryId)
+        ? selectedLibraryId
         : libs[0]?.id ?? null;
-      
+
       if (currentLib && currentLib !== selectedLibraryId) {
         setSelectedLibraryId(currentLib);
       }
@@ -260,6 +261,7 @@ export default function AudiobooksScreen() {
       } else {
         setLoading(false);
       }
+      setIsInitialized(true);
     } catch (err: any) {
       // Initialization error
       const isNetworkError = !err.response && (err.code === 'ECONNABORTED' || err.message?.includes('Network Error') || err.message?.includes('timeout'));
@@ -272,12 +274,16 @@ export default function AudiobooksScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
+  // Initial load on mount
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
   useFocusEffect(
     useCallback(() => {
-      initialize();
-      // Refresh the continue listening setting in case it changed
+      // Only refresh metadata on focus, don't reload everything
       setShowContinueListening(absAPI.isProgressTrackingEnabled());
-    }, [initialize])
+    }, [isInitialized])
   );
 
   // Refresh when playback is stopped (to sync progress bars)
