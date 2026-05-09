@@ -75,11 +75,22 @@ export const SeriesCard = React.memo(function SeriesCard({ series, onPress, onCo
   return (
     <TouchableOpacity
       ref={containerRef}
-      style={[cardWidth ? { width: cardWidth } : styles.cardFallback, style, Platform.OS === 'web' && (styles as any).webHover]}
+      style={[
+        cardWidth ? { width: cardWidth } : styles.cardFallback,
+        style,
+        {
+          borderRadius: Radius.md,
+          overflow: 'hidden',
+          backgroundColor: colors.surface + 'CC', // Add transparency (CC = ~80% opacity)
+          borderWidth: 1,
+          borderColor: colors.border,
+        },
+        Platform.OS === 'web' && (styles as any).webHover
+      ]}
       onPress={onPress}
       onLongPress={onContextMenu ? handleLongPress : undefined}
       delayLongPress={400}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
       {...(Platform.OS === 'web' ? { className: 'series-card-hover' } : {})}
     >
       <View style={[styles.coverContainer, { backgroundColor: Platform.OS === 'web' ? colors.overlay : colors.surface, backdropFilter: Platform.OS === 'web' ? 'blur(8px)' : undefined } as any]}>
@@ -110,7 +121,9 @@ export const SeriesCard = React.memo(function SeriesCard({ series, onPress, onCo
           </View>
         )}
       </View>
-      <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>{seriesTitle}</Text>
+      <View style={styles.titleContainer}>
+        <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>{seriesTitle}</Text>
+      </View>
     </TouchableOpacity>
   );
 });
@@ -232,6 +245,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   completedText: { fontSize: 10, fontWeight: Typography.bold },
+  titleContainer: {
+    padding: Spacing.sm,
+  },
   title: { fontSize: Typography.xs, lineHeight: 16 },
   // Hover overlay styles - web only
   hoverOverlay: {
