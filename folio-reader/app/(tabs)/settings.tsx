@@ -91,9 +91,10 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
   const [key, setKey] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [progressTracking, setProgressTracking] = useState(true);
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState('');
-  const [statusOk, setStatusOk] = useState(false);
+  const [statusOk, setStatusOk] = useState<boolean | null>(null);
   const [discoveredServers, setDiscoveredServers] = useState<DiscoveredServer[]>([]);
   const [scanning, setScanning] = useState(false);
   const [manualMode, setManualMode] = useState(false);
@@ -104,6 +105,7 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
       setKey(kavitaAPI.getApiKey() || '');
       setUsername(kavitaAPI.getUsername() || '');
       setPassword(kavitaAPI.getPassword() || '');
+      setProgressTracking(kavitaAPI.isProgressTrackingEnabled());
       setStatus('');
       setDiscoveredServers([]);
       setManualMode(false);
@@ -139,8 +141,8 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
   }
 
   async function handleSave() {
-    if (!url.trim() || !username.trim() || !password.trim()) {
-      setStatus('Server URL, username, and password are required.');
+    if (!url.trim() || !key.trim() || !username.trim() || !password.trim()) {
+      setStatus('Server URL, API key, username, and password are required.');
       setStatusOk(false);
       return;
     }
@@ -149,7 +151,7 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
     try {
       console.log('[KavitaModal] Starting save and test...');
       await kavitaAPI.saveCredentials(url.trim(), username.trim(), password.trim(), key.trim() || undefined);
-      console.log('[KavitaModal] Credentials saved, attempting login...');
+      await kavitaAPI.setProgressTrackingEnabled(progressTracking);
       
       // Authenticate to get JWT token (or validate API key for older Kavita versions)
       const loginSuccess = await kavitaAPI.login();
@@ -186,7 +188,7 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
       }
       
       setStatusOk(true);
-      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}.`);
+      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}${progressTracking ? ' with progress tracking.' : '.'}`);
       setTimeout(() => { onSuccess?.(); onClose(); }, 800);
     } catch (e: any) {
       console.error('[KavitaModal] Connection error:', e?.response?.status, e?.message, e);
@@ -284,45 +286,66 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
           </>
         )}
         <View style={{ marginBottom: Spacing.lg }}>
-          <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Username</Text>
-          <TextInput
-            style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.base, fontSize: Typography.base, color: colors.textPrimary }}
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Your Kavita username"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-        <View style={{ marginBottom: Spacing.lg }}>
-          <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Password</Text>
-          <TextInput
-            style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.base, fontSize: Typography.base, color: colors.textPrimary }}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Your Kavita password"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
-          />
-        </View>
-        <View style={{ marginBottom: Spacing.lg }}>
-          <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>API Key (Optional)</Text>
+          <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>API Key *</Text>
           <TextInput
             style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.base, fontSize: Typography.base, color: colors.textPrimary }}
             value={key}
             onChangeText={setKey}
-            placeholder="Your Kavita API key (for older versions)"
+            placeholder="Your Kavita API key"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
           />
-          <Text style={{ fontSize: Typography.xs, color: colors.textMuted, marginTop: 4 }}>Found in Kavita → User Settings → Security (for legacy auth)</Text>
+          <Text style={{ fontSize: Typography.xs, color: colors.textMuted, marginTop: 4 }}>Found in Kavita → User Settings → Security</Text>
         </View>
-        {status ? <Text style={{ fontSize: Typography.sm, marginBottom: Spacing.md, color: statusOk ? colors.success : colors.error }}>{status}</Text> : null}
+        <View style={{ marginBottom: Spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: Typography.base, fontWeight: Typography.semibold, color: colors.textPrimary }}>Continue Listening</Text>
+            <Text style={{ fontSize: Typography.sm, color: colors.textMuted, marginTop: 2 }}>Sync reading progress with server</Text>
+          </View>
+          <Switch
+            value={progressTracking}
+            onValueChange={setProgressTracking}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={progressTracking ? colors.accent : colors.surface}
+          />
+        </View>
+        {/* JWT Login Section (Required) */}
+        <View style={{ marginBottom: Spacing.lg, padding: Spacing.md, backgroundColor: colors.surface, borderRadius: Radius.md, borderLeftWidth: 3, borderLeftColor: colors.accent }}>
+          <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textPrimary, marginBottom: 2 }}>Login Required for Progress Tracking</Text>
+          <Text style={{ fontSize: Typography.xs, color: colors.textMuted }}>Enter your Kavita username and password to sync reading progress</Text>
+        </View>
+
+        <>
+          <View style={{ marginBottom: Spacing.lg }}>
+            <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Username *</Text>
+            <TextInput
+              style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.base, fontSize: Typography.base, color: colors.textPrimary }}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Your Kavita username"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={{ marginBottom: Spacing.lg }}>
+            <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Password *</Text>
+            <TextInput
+              style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.base, fontSize: Typography.base, color: colors.textPrimary }}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Your Kavita password"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+            />
+            <Text style={{ fontSize: Typography.xs, color: colors.textMuted, marginTop: 4 }}>Required for "Continue Listening" feature</Text>
+          </View>
+        </>
+        {status ? <Text style={{ fontSize: Typography.sm, marginBottom: Spacing.md, color: statusOk === true ? colors.success : statusOk === false ? colors.error : colors.textSecondary }}>{status}</Text> : null}
         <TouchableOpacity
           style={{ backgroundColor: colors.accent, borderRadius: Radius.md, padding: Spacing.base, alignItems: 'center', marginBottom: Spacing.md, opacity: testing ? 0.6 : 1 }}
           onPress={handleSave}
@@ -346,11 +369,10 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
   const [key, setKey] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showJwtFields, setShowJwtFields] = useState(false);
   const [progressTracking, setProgressTracking] = useState(true);
   const [testing, setTesting] = useState(false);
   const [status, setStatus] = useState('');
-  const [statusOk, setStatusOk] = useState(false);
+  const [statusOk, setStatusOk] = useState<boolean | null>(null);
   const [discoveredServers, setDiscoveredServers] = useState<DiscoveredServer[]>([]);
   const [scanning, setScanning] = useState(false);
   const [manualMode, setManualMode] = useState(false);
@@ -359,11 +381,10 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
     if (visible) {
       setUrl(absAPI.getServerUrl());
       setKey(absAPI.getApiKey() || '');
-      setUsername('');
-      setPassword('');
+      credentials.abs.getUsername().then(u => setUsername(u || ''));
+      credentials.abs.getPassword().then(p => setPassword(p || ''));
       setProgressTracking(absAPI.getProgressTrackingEnabled());
       setStatus('');
-      setShowJwtFields(false);
       setDiscoveredServers([]);
       setManualMode(false);
       // Auto-start quick scan
@@ -406,8 +427,8 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
   }
 
   async function handleSave() {
-    if (!url.trim() || !key.trim()) {
-      setStatus('Server URL and API key are required.');
+    if (!url.trim() || !key.trim() || !username.trim() || !password.trim()) {
+      setStatus('Server URL, API key, username, and password are required.');
       setStatusOk(false);
       return;
     }
@@ -417,17 +438,14 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
       await absAPI.saveCredentials(url.trim(), key.trim());
       await absAPI.setProgressTrackingEnabled(progressTracking);
       
-      // If JWT credentials provided, try to login
-      let jwtSuccess = false;
-      if (username.trim() && password.trim()) {
-        setStatus('Testing connection & logging in...');
-        jwtSuccess = await absAPI.loginWithCredentials(username.trim(), password.trim());
-        if (!jwtSuccess) {
-          setStatusOk(false);
-          setStatus('Server connected but JWT login failed. Check username/password.');
-          setTesting(false);
-          return;
-        }
+      // JWT login is now required for progress tracking
+      setStatus('Testing connection & logging in...');
+      const jwtSuccess = await absAPI.loginWithCredentials(username.trim(), password.trim());
+      if (!jwtSuccess) {
+        setStatusOk(false);
+        setStatus('JWT login failed. Check username/password.');
+        setTesting(false);
+        return;
       }
       
       // Use getLibraries() instead of ping() — ping() bypasses the proxy and hits
@@ -435,8 +453,7 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
       // through /dynamic-proxy?url= and also verifies the server is actually ABS.
       const libraries = await absAPI.getLibraries();
       setStatusOk(true);
-      const jwtMsg = jwtSuccess ? ' with progress tracking' : '';
-      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}${jwtMsg}.`);
+      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'} with progress tracking.`);
       setTimeout(() => { onSuccess?.(); onClose(); }, 800);
     } catch (e: any) {
       setStatusOk(false);
@@ -551,19 +568,15 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
             </View>
           </View>
 
-          {/* JWT Login Section (Optional) */}
-          <TouchableOpacity
-            onPress={() => setShowJwtFields(!showJwtFields)}
-            style={{ marginBottom: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}
-          >
-            <Ionicons name={showJwtFields ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textSecondary} />
-            <Text style={{ fontSize: Typography.sm, color: colors.textSecondary }}>Optional: Login for progress sync (JWT)</Text>
-          </TouchableOpacity>
+          {/* JWT Login Section (Required) */}
+          <View style={{ marginBottom: Spacing.md, padding: Spacing.md, backgroundColor: colors.surface, borderRadius: Radius.md, borderLeftWidth: 3, borderLeftColor: colors.accent }}>
+            <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textPrimary, marginBottom: 2 }}>Login Required for Progress Tracking</Text>
+            <Text style={{ fontSize: Typography.xs, color: colors.textMuted }}>Enter your ABS username and password to sync reading progress</Text>
+          </View>
 
-          {showJwtFields && (
-            <>
-              <View style={{ marginBottom: Spacing.lg }}>
-                <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Username (Optional)</Text>
+          <>
+            <View style={{ marginBottom: Spacing.lg }}>
+              <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Username *</Text>
                 <TextInput
                   style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.base, fontSize: Typography.base, color: colors.textPrimary }}
                   value={username}
@@ -575,7 +588,7 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
                 />
               </View>
               <View style={{ marginBottom: Spacing.lg }}>
-                <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Password (Optional)</Text>
+                <Text style={{ fontSize: Typography.sm, fontWeight: Typography.semibold, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.xs }}>Password *</Text>
                 <TextInput
                   style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: Radius.md, padding: Spacing.base, fontSize: Typography.base, color: colors.textPrimary }}
                   value={password}
@@ -589,9 +602,8 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
                 <Text style={{ fontSize: Typography.xs, color: colors.textMuted, marginTop: 4 }}>Required for "Continue Listening" feature</Text>
               </View>
             </>
-          )}
           
-          {status ? <Text style={{ fontSize: Typography.sm, marginBottom: Spacing.md, color: statusOk ? colors.success : colors.error }}>{status}</Text> : null}
+          {status ? <Text style={{ fontSize: Typography.sm, marginBottom: Spacing.md, color: statusOk === true ? colors.success : statusOk === false ? colors.error : colors.textSecondary }}>{status}</Text> : null}
           <TouchableOpacity
             style={{ backgroundColor: colors.accent, borderRadius: Radius.md, padding: Spacing.base, alignItems: 'center', marginBottom: Spacing.md, opacity: testing ? 0.6 : 1 }}
             onPress={handleSave}
