@@ -192,6 +192,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: Spacing.base,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
 });

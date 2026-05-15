@@ -85,7 +85,7 @@ export const SeriesCard = React.memo(function SeriesCard({ series, onPress, onCo
           borderWidth: 1,
           borderColor: colors.border,
           flex: 1, // Make cards stretch to fill row height
-          minHeight: 280, // Ensure minimum height for consistent row height
+          minHeight: 200, // Ensure minimum height for consistent row height
         },
         Platform.OS === 'web' && (styles as any).webHover
       ]}
