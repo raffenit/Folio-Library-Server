@@ -19,6 +19,10 @@ deploy-webhook.js
 Dockerfile.deploy
 docker-compose.deploy.yml
 
+# Server-specific compose and proxy config (template versions are in folio-reader/)
+/docker-compose.yml
+/Caddyfile
+
 # Build outputs
 dist/
 build/

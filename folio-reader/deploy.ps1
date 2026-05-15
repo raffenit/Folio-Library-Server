@@ -1,64 +1,78 @@
 #!/usr/bin/env pwsh
-# Folio Deployment Script for Windows/Docker
-# Run this after pulling latest changes from git
+# Folio Docker Compose Deployment Script
+# Builds and deploys the full stack: Folio + Kavita + ABS + Caddy
+#
+# Usage:
+#   .\deploy.ps1                    # Deploy with ../docker-compose.yml
+#   .\deploy.ps1 -File ..\docker-compose.yml   # Custom compose path
 
 param(
-    [string]$Port = "3002",
-    [string]$Network = "media-network",
-    [switch]$UpdateCaddy = $false
+    [string]$File = "..\docker-compose.yml",
+    [switch]$Pull = $false,
+    [switch]$Down = $false
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Folio Deployment Script" -ForegroundColor Cyan
+Write-Host "Folio Docker Compose Deployment" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Compose file: $File" -ForegroundColor Gray
 
-# 1. Build the image
-Write-Host "`n[1/4] Building Docker image..." -ForegroundColor Yellow
-docker build -t folio:latest .
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Docker build failed!"
+# Verify compose file exists
+if (-not (Test-Path $File)) {
+    Write-Error "Compose file not found: $File"
+    Write-Host "`nHint: Copy the template and customize:" -ForegroundColor Yellow
+    Write-Host "  cp docker-compose.caddy.template.yml ..\docker-compose.yml" -ForegroundColor Yellow
     exit 1
 }
 
-# 2. Stop and remove old container
-Write-Host "`n[2/4] Stopping old container..." -ForegroundColor Yellow
-$containerExists = docker ps -aq -f name=folio
-if ($containerExists) {
-    docker stop folio
-    docker rm folio
-    Write-Host "Old container removed." -ForegroundColor Green
-} else {
-    Write-Host "No existing container found." -ForegroundColor Gray
+# Stop existing stack if requested
+if ($Down) {
+    Write-Host "`n[1/3] Stopping existing stack..." -ForegroundColor Yellow
+    docker-compose -f $File down
 }
 
-# 3. Start new container
-Write-Host "`n[3/4] Starting new container on port $Port..." -ForegroundColor Yellow
-docker run -d --name folio --network $Network -p "${Port}:80" folio:latest
+# Pull latest images if requested
+if ($Pull) {
+    Write-Host "`n[1/3] Pulling latest images..." -ForegroundColor Yellow
+    docker-compose -f $File pull
+}
+
+# Build and start
+Write-Host "`n[1/3] Building and starting services..." -ForegroundColor Yellow
+docker-compose -f $File up -d --build
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Failed to start container!"
+    Write-Error "docker-compose up failed!"
     exit 1
 }
 
-# 4. Health check
-Write-Host "`n[4/4] Health check..." -ForegroundColor Yellow
-Start-Sleep -Seconds 2
-$health = docker ps -f name=folio --format "{{.Status}}"
-Write-Host "Container status: $health" -ForegroundColor Green
+# Health check
+Write-Host "`n[2/3] Checking service status..." -ForegroundColor Yellow
+Start-Sleep -Seconds 3
+$services = docker-compose -f $File ps --format "table {{.Name}}`t{{.Status}}`t{{.Ports}}"
+Write-Host $services
 
-# Test proxy endpoint
-Write-Host "Testing /dynamic-proxy endpoint..." -ForegroundColor Gray
-try {
-    $test = Invoke-WebRequest -Uri "http://localhost:$Port/dynamic-proxy?url=http://example.com" -Method GET -TimeoutSec 5 -ErrorAction SilentlyContinue
-    Write-Host "Proxy endpoint responding: $($test.StatusCode)" -ForegroundColor Green
-} catch {
-    Write-Host "Proxy test: $($_.Exception.Message)" -ForegroundColor Yellow
+# Test endpoints
+Write-Host "`n[3/3] Testing endpoints..." -ForegroundColor Yellow
+$endpoints = @(
+    @{ Name = "Folio"; Url = "http://localhost/dynamic-proxy?url=http://example.com" },
+    @{ Name = "Kavita"; Url = "http://localhost:8050/api/health" },
+    @{ Name = "ABS"; Url = "http://localhost:13378/api/health" }
+)
+
+foreach ($ep in $endpoints) {
+    try {
+        $response = Invoke-WebRequest -Uri $ep.Url -Method GET -TimeoutSec 5 -ErrorAction SilentlyContinue
+        Write-Host "  $($ep.Name): OK (HTTP $($response.StatusCode))" -ForegroundColor Green
+    } catch {
+        Write-Host "  $($ep.Name): Not ready yet (expected during startup)" -ForegroundColor Yellow
+    }
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Deployment complete!" -ForegroundColor Green
-Write-Host "Folio running at: http://localhost:$Port" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
-
-if ($UpdateCaddy) {
-    Write-Host "`nNote: Remember to update Caddyfile if you changed ports!" -ForegroundColor Yellow
-}
+Write-Host "Folio:     http://localhost" -ForegroundColor Cyan
+Write-Host "Kavita:    http://localhost:8050" -ForegroundColor Cyan
+Write-Host "ABS:       http://localhost:13378" -ForegroundColor Cyan
+Write-Host "`nTo view logs: docker-compose -f $File logs -f" -ForegroundColor Gray
+Write-Host "To stop:     docker-compose -f $File down" -ForegroundColor Gray

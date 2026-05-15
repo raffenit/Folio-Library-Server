@@ -186,12 +186,12 @@ Improved: <img src="/image-proxy?seriesId=1">
 
 ```bash
 # 1. Get JWT token
-curl -X POST http://100.104.199.67:8050/api/Account/login \
+curl -X POST http://YOUR_KAVITA_URL:8050/api/Account/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "yourpassword"}'
 
 # 2. Use JWT to call API
-curl http://100.104.199.67:8050/api/Library \
+curl http://YOUR_KAVITA_URL:8050/api/Library \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
@@ -199,13 +199,13 @@ curl http://100.104.199.67:8050/api/Library \
 
 ```bash
 # Test WITHOUT auth (should fail/redirect)
-curl -I http://100.104.199.67:8050/api/image/series-cover?seriesId=1
+curl -I http://YOUR_KAVITA_URL:8050/api/image/series-cover?seriesId=1
 
 # Test WITH apiKey param
-curl -I http://100.104.199.67:8050/api/image/series-cover?seriesId=1&apiKey=YOUR_KEY
+curl -I http://YOUR_KAVITA_URL:8050/api/image/series-cover?seriesId=1&apiKey=YOUR_KEY
 
 # Test WITH JWT header (should work but not usable in browsers)
-curl -I http://100.104.199.67:8050/api/image/series-cover?seriesId=1 \
+curl -I http://YOUR_KAVITA_URL:8050/api/image/series-cover?seriesId=1 \
   -H "Authorization: Bearer <JWT_TOKEN>"
 ```
 
