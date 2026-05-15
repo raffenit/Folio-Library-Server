@@ -15,7 +15,7 @@ param(
 # Resolve default path relative to script location
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ([string]::IsNullOrEmpty($File)) {
-    $File = Join-Path $scriptDir "..\docker-compose.yml"
+    $File = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\docker-compose.yml"))
 }
 
 Write-Host "========================================" -ForegroundColor Cyan
