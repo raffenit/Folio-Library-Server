@@ -41,7 +41,7 @@ services:
 
   folio:
     build:
-      context: ./Folio-Library-Server/folio-reader
+      context: ./folio-reader
       dockerfile: Dockerfile
     container_name: folio
     restart: unless-stopped
@@ -50,7 +50,7 @@ services:
 
   webhook-server:
     build:
-      context: ./Folio-Library-Server/folio-reader
+      context: ./folio-reader
       dockerfile: Dockerfile.webhook
     container_name: folio-webhook
     ports:
@@ -60,7 +60,7 @@ services:
       - PUBLIC_SERVER_URL=${PUBLIC_SERVER_URL}
       - FOLIO_API_KEY=${FOLIO_API_KEY}
     volumes:
-      - ./Folio-Library-Server:/repo
+      - .:/repo
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
     restart: unless-stopped
