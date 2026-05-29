@@ -29,9 +29,13 @@ export const ENV_VARS = {
   },
   ABS: {
     URL: 'EXPO_PUBLIC_ABS_URL',
-    API_KEY: 'EXPO_PUBLIC_ABS_TOKEN',
+    API_KEY: 'EXPO_PUBLIC_ABS_API_KEY',
     USERNAME: 'EXPO_PUBLIC_ABS_USERNAME',
     PASSWORD: 'EXPO_PUBLIC_ABS_PASSWORD',
+  },
+  PROFILE: {
+    URL: 'EXPO_PUBLIC_PROFILE_URL',
+    API_KEY: 'EXPO_PUBLIC_PROFILE_API_KEY',
   },
   GOOGLE_BOOKS: {
     API_KEY: 'EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY',
@@ -122,9 +126,47 @@ function getEnv(key: string): string | undefined {
   return process.env[key];
 }
 
+/**
+ * Check multiple env var names and return the first non-empty value.
+ * Supports both EXPO_PUBLIC_* (browser/build-time) and raw names (Node.js runtime).
+ */
+function getEnvMulti(...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const val = process.env[key];
+    if (val !== undefined && val !== '') return val;
+  }
+  return undefined;
+}
+
 function getEnvBool(key: string): boolean {
   const val = process.env[key];
   return val === 'true' || val === '1';
+}
+
+/**
+ * Extract server hostname from PUBLIC_SERVER_URL for constructing media server URLs.
+ * Falls back to 'localhost' if no PUBLIC_SERVER_URL is configured.
+ */
+function getServerHost(): string {
+  const publicUrl = getEnvMulti('EXPO_PUBLIC_PUBLIC_SERVER_URL', 'PUBLIC_SERVER_URL');
+  if (publicUrl) {
+    try {
+      return new URL(publicUrl).hostname;
+    } catch {
+      // Invalid URL, fall through
+    }
+  }
+  return 'localhost';
+}
+
+/**
+ * Construct a server URL from a PORT environment variable.
+ * Uses the hostname from PUBLIC_SERVER_URL if available, otherwise localhost.
+ */
+function buildUrlFromPort(portVar: string): string | undefined {
+  const port = getEnvMulti(`EXPO_PUBLIC_${portVar}`, portVar);
+  if (!port) return undefined;
+  return `http://${getServerHost()}:${port}`;
 }
 
 // ============================================================================
@@ -137,7 +179,8 @@ export const credentials = {
    */
   kavita: {
     async getServerUrl(): Promise<string | null> {
-      return getEnv(ENV_VARS.KAVITA.URL) || 
+      return getEnvMulti(ENV_VARS.KAVITA.URL, 'KAVITA_URL') ||
+             buildUrlFromPort('KAVITA_PORT') ||
              await storage.getItem(STORAGE_KEYS.KAVITA.SERVER_URL);
     },
     
@@ -146,7 +189,7 @@ export const credentials = {
     },
     
     async getApiKey(): Promise<string | null> {
-      return getEnv(ENV_VARS.KAVITA.API_KEY) || 
+      return getEnvMulti(ENV_VARS.KAVITA.API_KEY, 'KAVITA_API_KEY') ||
              await storage.getItem(STORAGE_KEYS.KAVITA.API_KEY);
     },
     
@@ -155,7 +198,7 @@ export const credentials = {
     },
 
     async getUsername(): Promise<string | null> {
-      return getEnv(ENV_VARS.KAVITA.USERNAME) ||
+      return getEnvMulti(ENV_VARS.KAVITA.USERNAME, 'KAVITA_JWT_USERNAME', 'KAVITA_USERNAME') ||
              await storage.getItem(STORAGE_KEYS.KAVITA.USERNAME);
     },
 
@@ -164,7 +207,7 @@ export const credentials = {
     },
 
     async getPassword(): Promise<string | null> {
-      return getEnv(ENV_VARS.KAVITA.PASSWORD) ||
+      return getEnvMulti(ENV_VARS.KAVITA.PASSWORD, 'KAVITA_JWT_PASSWORD', 'KAVITA_PASSWORD') ||
              await storage.getItem(STORAGE_KEYS.KAVITA.PASSWORD);
     },
 
@@ -210,7 +253,8 @@ export const credentials = {
    */
   abs: {
     async getServerUrl(): Promise<string | null> {
-      return getEnv(ENV_VARS.ABS.URL) || 
+      return getEnvMulti(ENV_VARS.ABS.URL, 'ABS_URL') ||
+             buildUrlFromPort('ABS_PORT') ||
              await storage.getItem(STORAGE_KEYS.ABS.SERVER_URL);
     },
     
@@ -219,7 +263,7 @@ export const credentials = {
     },
     
     async getApiKey(): Promise<string | null> {
-      return getEnv(ENV_VARS.ABS.API_KEY) || 
+      return getEnvMulti(ENV_VARS.ABS.API_KEY, 'ABS_API_KEY') ||
              await storage.getItem(STORAGE_KEYS.ABS.API_KEY);
     },
     
@@ -228,7 +272,7 @@ export const credentials = {
     },
     
     async getUsername(): Promise<string | null> {
-      return getEnv(ENV_VARS.ABS.USERNAME) || 
+      return getEnvMulti(ENV_VARS.ABS.USERNAME, 'ABS_JWT_USERNAME', 'ABS_USERNAME') ||
              await storage.getItem(STORAGE_KEYS.ABS.USERNAME);
     },
     
@@ -237,7 +281,7 @@ export const credentials = {
     },
     
     async getPassword(): Promise<string | null> {
-      return getEnv(ENV_VARS.ABS.PASSWORD) || 
+      return getEnvMulti(ENV_VARS.ABS.PASSWORD, 'ABS_JWT_PASSWORD', 'ABS_PASSWORD') ||
              await storage.getItem(STORAGE_KEYS.ABS.PASSWORD);
     },
     
@@ -281,11 +325,37 @@ export const credentials = {
   },
 
   /**
-   * Google Books API credentials
+   * Profile sync server credentials
    */
+  profile: {
+    async getServerUrl(): Promise<string | null> {
+      return getEnvMulti(ENV_VARS.PROFILE.URL, 'PUBLIC_SERVER_URL') ||
+             buildUrlFromPort('PROFILE_PORT') ||
+             await storage.getItem('folio_profile_server_url');
+    },
+
+    async setServerUrl(url: string): Promise<void> {
+      await storage.setItem('folio_profile_server_url', url);
+    },
+
+    async getApiKey(): Promise<string | null> {
+      return getEnvMulti(ENV_VARS.PROFILE.API_KEY, 'PROFILE_API_KEY', 'FOLIO_API_KEY') ||
+             await storage.getItem('folio_profile_api_key');
+    },
+
+    async setApiKey(key: string): Promise<void> {
+      await storage.setItem('folio_profile_api_key', key);
+    },
+
+    async clearAll(): Promise<void> {
+      await storage.deleteItem('folio_profile_server_url');
+      await storage.deleteItem('folio_profile_api_key');
+    },
+  },
+
   googleBooks: {
     async getApiKey(): Promise<string | null> {
-      return getEnv(ENV_VARS.GOOGLE_BOOKS.API_KEY) || 
+      return getEnvMulti(ENV_VARS.GOOGLE_BOOKS.API_KEY, 'GOOGLE_BOOKS_API_KEY') ||
              await storage.getItem(STORAGE_KEYS.GOOGLE_BOOKS.API_KEY);
     },
     
@@ -304,6 +374,7 @@ export const credentials = {
   async clearAll(): Promise<void> {
     await this.kavita.clearAll();
     await this.abs.clearAll();
+    await this.profile.clearAll();
     await this.googleBooks.clear();
   },
 };

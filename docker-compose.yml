@@ -43,6 +43,18 @@ services:
     build:
       context: ./folio-reader
       dockerfile: Dockerfile
+      args:
+        - EXPO_PUBLIC_KAVITA_URL=${EXPO_PUBLIC_KAVITA_URL:-http://localhost:8050}
+        - EXPO_PUBLIC_KAVITA_API_KEY=${KAVITA_API_KEY}
+        - EXPO_PUBLIC_KAVITA_USERNAME=${KAVITA_JWT_USERNAME}
+        - EXPO_PUBLIC_KAVITA_PASSWORD=${KAVITA_JWT_PASSWORD}
+        - EXPO_PUBLIC_ABS_URL=${EXPO_PUBLIC_ABS_URL:-http://localhost:81}
+        - EXPO_PUBLIC_ABS_API_KEY=${ABS_API_KEY}
+        - EXPO_PUBLIC_ABS_USERNAME=${ABS_JWT_USERNAME}
+        - EXPO_PUBLIC_ABS_PASSWORD=${ABS_JWT_PASSWORD}
+        - EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY=${GOOGLE_BOOKS_API_KEY}
+        - EXPO_PUBLIC_PUBLIC_SERVER_URL=${PUBLIC_SERVER_URL}
+        - EXPO_PUBLIC_PROFILE_API_KEY=${PROFILE_API_KEY}
     container_name: folio
     restart: unless-stopped
     networks:
