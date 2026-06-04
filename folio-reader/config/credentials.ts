@@ -122,24 +122,35 @@ function getProfileScopedKey(baseKey: string): string {
 // Environment Helpers
 // ============================================================================
 
-function getEnv(key: string): string | undefined {
-  return process.env[key];
-}
-
 /**
  * Check multiple env var names and return the first non-empty value.
- * Supports both EXPO_PUBLIC_* (browser/build-time) and raw names (Node.js runtime).
+ * Uses explicit literal property access on process.env so the Expo bundler
+ * can statically replace EXPO_PUBLIC_* variables at build time.
+ * Dynamic access (process.env[key]) is NOT analyzable by the bundler.
  */
 function getEnvMulti(...keys: string[]): string | undefined {
   for (const key of keys) {
-    const val = process.env[key];
+    // Explicit literal access — required for static bundler replacement
+    const val = key === 'EXPO_PUBLIC_KAVITA_URL' ? process.env.EXPO_PUBLIC_KAVITA_URL
+      : key === 'EXPO_PUBLIC_KAVITA_API_KEY' ? process.env.EXPO_PUBLIC_KAVITA_API_KEY
+      : key === 'EXPO_PUBLIC_KAVITA_USERNAME' ? process.env.EXPO_PUBLIC_KAVITA_USERNAME
+      : key === 'EXPO_PUBLIC_KAVITA_PASSWORD' ? process.env.EXPO_PUBLIC_KAVITA_PASSWORD
+      : key === 'EXPO_PUBLIC_ABS_URL' ? process.env.EXPO_PUBLIC_ABS_URL
+      : key === 'EXPO_PUBLIC_ABS_API_KEY' ? process.env.EXPO_PUBLIC_ABS_API_KEY
+      : key === 'EXPO_PUBLIC_ABS_USERNAME' ? process.env.EXPO_PUBLIC_ABS_USERNAME
+      : key === 'EXPO_PUBLIC_ABS_PASSWORD' ? process.env.EXPO_PUBLIC_ABS_PASSWORD
+      : key === 'EXPO_PUBLIC_PUBLIC_SERVER_URL' ? process.env.EXPO_PUBLIC_PUBLIC_SERVER_URL
+      : key === 'EXPO_PUBLIC_PROFILE_API_KEY' ? process.env.EXPO_PUBLIC_PROFILE_API_KEY
+      : key === 'EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY' ? process.env.EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY
+      : key === 'EXPO_PUBLIC_OPENLIBRARY_ENABLED' ? process.env.EXPO_PUBLIC_OPENLIBRARY_ENABLED
+      : process.env[key];
     if (val !== undefined && val !== '') return val;
   }
   return undefined;
 }
 
 function getEnvBool(key: string): boolean {
-  const val = process.env[key];
+  const val = getEnvMulti(key);
   return val === 'true' || val === '1';
 }
 
