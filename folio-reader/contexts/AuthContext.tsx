@@ -74,7 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Try to connect to Kavita if credentials exist
       let kavitaSuccess = false;
       if (kavitaAPI.hasCredentials()) {
+        // Try JWT login first (for progress tracking users)
         kavitaSuccess = await kavitaAPI.login();
+        // If JWT login fails, fall back to API key validation (API key-only mode)
+        if (!kavitaSuccess) {
+          kavitaSuccess = await kavitaAPI.validateApiKey();
+        }
         setKavitaConnected(kavitaSuccess);
         console.log('[AuthContext] Kavita connection:', kavitaSuccess ? 'connected' : 'failed');
       }
@@ -153,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // --- TEST 2: KAVITA ---
       try {
         console.log('[AuthContext] Trying Kavita login...');
-        await kavitaAPI.saveCredentials(url.trim(), apiKey);
+        await kavitaAPI.saveCredentials(url.trim(), '', '', apiKey);
         const isKavita = await kavitaAPI.login();
         console.log('[AuthContext] Kavita login result:', isKavita);
         if (isKavita) {
@@ -242,9 +247,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('[AuthContext] Rechecking connections...');
     let kavitaSuccess = false;
     let absSuccess = false;
-    
+
     if (kavitaAPI.hasCredentials()) {
+      // Try JWT login first, then fall back to API key validation
       kavitaSuccess = await kavitaAPI.login();
+      if (!kavitaSuccess) {
+        kavitaSuccess = await kavitaAPI.validateApiKey();
+      }
       setKavitaConnected(kavitaSuccess);
       console.log('[AuthContext] Kavita recheck:', kavitaSuccess ? 'connected' : 'failed');
     } else {

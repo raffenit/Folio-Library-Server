@@ -594,7 +594,7 @@ export default function EbooksScreen() {
     timestamp: number;
   } | null>(null);
 
-  // Load persistent cache on mount
+  // Load persistent cache on mount (but NOT libraries — those are always fetched fresh)
   useEffect(() => {
     const loadPersistentCache = async () => {
       try {
@@ -603,7 +603,7 @@ export default function EbooksScreen() {
           const parsed = JSON.parse(cached);
           if (parsed && Date.now() - parsed.timestamp < 30 * 60 * 1000) { // 30 min TTL
             metadataCacheRef.current = parsed;
-            if (parsed.libraries?.length > 0) setLibraries(parsed.libraries);
+            // Libraries are loaded fresh via getLibraries() below — do NOT load from cache
             if (parsed.genres?.length > 0) setGenres(parsed.genres);
             if (parsed.tags?.length > 0) setTags(parsed.tags);
             if (parsed.collections?.length > 0) setCollections(parsed.collections);

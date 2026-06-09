@@ -105,7 +105,8 @@ export default function ImageReaderScreen() {
 
   // Memoize URL building to prevent rebuilding on every render
   const { chapterInfoUrl, imageBaseUrl, apiKey } = useMemo(() => {
-    if (!proxyOrigin || !serverUrl) {
+    // In proxy mode serverUrl is '' but proxyOrigin handles routing; only bail if proxy isn't set
+    if (!proxyOrigin) {
       return { chapterInfoUrl: '', imageBaseUrl: '', apiKey: '' };
     }
     // Include apiKey in both URLs for authentication

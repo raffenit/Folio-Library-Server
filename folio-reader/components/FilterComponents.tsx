@@ -397,7 +397,7 @@ export function FilterSection<T extends { id: string | number; title: string }>(
   onSelectAuthor,
   onSelectTag,
   onSelectCollection,
-  defaultTab = 'genre',
+  defaultTab = 'library',
   hideLibraryTab = false,
   onChipContextMenu,
   onCreateChip,
@@ -405,7 +405,7 @@ export function FilterSection<T extends { id: string | number; title: string }>(
 }: FilterSectionProps<T>) {
   const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<FilterType>(
-    hideLibraryTab && defaultTab === 'library' ? 'genre' : defaultTab
+    hideLibraryTab && defaultTab === 'library' ? 'collection' : defaultTab
   );
 
   const hasLibrary = !hideLibraryTab && libraries.length > 0;
@@ -437,15 +437,15 @@ export function FilterSection<T extends { id: string | number; title: string }>(
             />
           )}
           <FilterTab
-            label="Genre"
-            active={activeTab === 'genre'}
-            onPress={() => setActiveTab('genre')}
+            label="Collection"
+            active={activeTab === 'collection'}
+            onPress={() => setActiveTab('collection')}
             isFirst={!hasLibrary}
           />
           <FilterTab
-            label="Author"
-            active={activeTab === 'author'}
-            onPress={() => setActiveTab('author')}
+            label="Genre"
+            active={activeTab === 'genre'}
+            onPress={() => setActiveTab('genre')}
           />
           <FilterTab
             label="Tag"
@@ -453,9 +453,9 @@ export function FilterSection<T extends { id: string | number; title: string }>(
             onPress={() => setActiveTab('tag')}
           />
           <FilterTab
-            label="Collection"
-            active={activeTab === 'collection'}
-            onPress={() => setActiveTab('collection')}
+            label="Author"
+            active={activeTab === 'author'}
+            onPress={() => setActiveTab('author')}
             isLast
           />
         </ScrollView>

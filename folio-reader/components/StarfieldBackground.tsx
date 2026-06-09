@@ -226,10 +226,10 @@ export function StarfieldBackground() {
         0%, 100% { opacity: 0.4; } 
         50% { opacity: 0.9; } 
       }
-      @keyframes starfield-rotate { 
-        0% { transform: rotate(0deg) scale(1.5); }
-        50% { transform: rotate(180deg) scale(1.5); }
-        100% { transform: rotate(360deg) scale(1.5); }
+      @keyframes starfield-rotate {
+        0% { transform: rotate(0deg); }
+        50% { transform: rotate(180deg); }
+        100% { transform: rotate(360deg); }
       }
     `;
     

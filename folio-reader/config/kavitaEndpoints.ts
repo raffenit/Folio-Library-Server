@@ -6,6 +6,7 @@ export const KAVITA_ENDPOINTS = {
   libraries: [
     '/api/Library',         // Standard library endpoint
     '/api/library',         // Lowercase variant
+    '/api/libraries',      // Plural variant
     '/api/v2/library',      // v2 variant
     '/api/Library/all',     // Legacy fallback
     '/api/Server/info',     // Server info endpoint (may contain library info)

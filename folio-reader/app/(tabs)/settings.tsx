@@ -141,8 +141,8 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
   }
 
   async function handleSave() {
-    if (!url.trim() || !key.trim() || !username.trim() || !password.trim()) {
-      setStatus('Server URL, API key, username, and password are required.');
+    if (!url.trim() || !key.trim()) {
+      setStatus('Server URL and API key are required.');
       setStatusOk(false);
       return;
     }
@@ -152,43 +152,60 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
       console.log('[KavitaModal] Starting save and test...');
       await kavitaAPI.saveCredentials(url.trim(), username.trim(), password.trim(), key.trim() || undefined);
       await kavitaAPI.setProgressTrackingEnabled(progressTracking);
-      
-      // Authenticate to get JWT token (or validate API key for older Kavita versions)
-      const loginSuccess = await kavitaAPI.login();
-      console.log('[KavitaModal] Login result:', loginSuccess);
-      
-      if (!loginSuccess) {
+
+      // Always validate API key first — this is the baseline requirement
+      const apiOk = await kavitaAPI.validateApiKey();
+      if (!apiOk) {
         setStatusOk(false);
-        setStatus('Login failed — check your API key.');
+        setStatus('API key validation failed. Check URL and API key.');
+        setTesting(false);
         return;
       }
-      
+
+      // If username/password provided, try JWT login for progress tracking.
+      // If JWT login fails, we still keep the API key connection but without
+      // progress tracking, and clear stale stored credentials.
+      const hasJwtCreds = username.trim() && password.trim();
+      let jwtSuccess = false;
+      if (hasJwtCreds) {
+        setStatus('Testing connection & logging in...');
+        jwtSuccess = await kavitaAPI.login();
+        console.log('[KavitaModal] Login result:', jwtSuccess);
+        if (!jwtSuccess) {
+          // Clear stale stored credentials so future sessions don't retry bad JWT
+          await credentials.kavita.setUsername('');
+          await credentials.kavita.setPassword('');
+          await credentials.kavita.setJwtToken('');
+        }
+      }
+
       setStatus('Fetching libraries...');
       // Test the connection by fetching libraries (like ABS does)
       const libraries = await kavitaAPI.getLibraries();
       console.log('[KavitaModal] Libraries response:', libraries, 'type:', typeof libraries, 'isArray:', Array.isArray(libraries));
-      
+
       if (libraries === undefined || libraries === null) {
         setStatusOk(false);
         setStatus('Invalid response from server (empty). Check API key permissions.');
         return;
       }
-      
+
       if (!Array.isArray(libraries)) {
         setStatusOk(false);
         setStatus(`Invalid response format from server (${typeof libraries}). Check API key permissions.`);
         return;
       }
-      
+
       if (libraries.length === 0) {
         setStatusOk(true);
         setStatus('Connected! No libraries found on this server.');
         setTimeout(() => { onSuccess?.(); onClose(); }, 1200);
         return;
       }
-      
+
       setStatusOk(true);
-      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}${progressTracking ? ' with progress tracking.' : '.'}`);
+      const trackingMsg = jwtSuccess ? ' with progress tracking.' : '.';
+      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}${trackingMsg}`);
       setTimeout(() => { onSuccess?.(); onClose(); }, 800);
     } catch (e: any) {
       console.error('[KavitaModal] Connection error:', e?.response?.status, e?.message, e);
@@ -438,26 +455,29 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
       await absAPI.saveCredentials(url.trim(), key.trim());
       await absAPI.setProgressTrackingEnabled(progressTracking);
 
-      // If username/password provided, try JWT login for progress tracking
+      // Always validate API key first — this is the baseline requirement
+      setStatus('Testing connection...');
+      const apiOk = await absAPI.validateApiKey();
+      if (!apiOk) {
+        setStatusOk(false);
+        setStatus('API key validation failed. Check URL and API key.');
+        setTesting(false);
+        return;
+      }
+
+      // If username/password provided, try JWT login for progress tracking.
+      // If JWT login fails, we still keep the API key connection but without
+      // progress tracking, and clear stale stored credentials.
       const hasJwtCreds = username.trim() && password.trim();
+      let jwtSuccess = false;
       if (hasJwtCreds) {
         setStatus('Testing connection & logging in...');
-        const jwtSuccess = await absAPI.loginWithCredentials(username.trim(), password.trim());
+        jwtSuccess = await absAPI.loginWithCredentials(username.trim(), password.trim());
         if (!jwtSuccess) {
-          setStatusOk(false);
-          setStatus('JWT login failed. Check username/password.');
-          setTesting(false);
-          return;
-        }
-      } else {
-        // API key only — validate without login
-        setStatus('Testing connection...');
-        const apiOk = await absAPI.validateApiKey();
-        if (!apiOk) {
-          setStatusOk(false);
-          setStatus('API key validation failed. Check URL and API key.');
-          setTesting(false);
-          return;
+          // Clear stale stored credentials so future sessions don't retry bad JWT
+          await credentials.abs.setUsername('');
+          await credentials.abs.setPassword('');
+          await credentials.abs.setJwtToken('');
         }
       }
 
@@ -466,7 +486,7 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
       // through /dynamic-proxy?url= and also verifies the server is actually ABS.
       const libraries = await absAPI.getLibraries();
       setStatusOk(true);
-      const trackingMsg = hasJwtCreds ? ' with progress tracking.' : '.';
+      const trackingMsg = jwtSuccess ? ' with progress tracking.' : '.';
       setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}${trackingMsg}`);
       setTimeout(() => { onSuccess?.(); onClose(); }, 800);
     } catch (e: any) {

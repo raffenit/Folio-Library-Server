@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import { Platform } from 'react-native';
 import { KAVITA_ENDPOINTS, tryEndpoints } from '../config/kavitaEndpoints';
 import { storage } from './storage';
-import { PROXY_PATH, isProxied, extractTargetUrl } from '@/config/proxy';
+import { PROXY_PATH, isProxied, extractTargetUrl, proxyUrl } from '@/config/proxy';
 import { credentials, STORAGE_KEYS } from '@/config/credentials';
 
 /**
@@ -185,6 +185,17 @@ class KavitaAPI {
   private proxyOrigin: string | null = null;
   private detectedEndpoints: Map<string, string> = new Map();
   private serverVersion: string | null = null;
+
+  /** Extract a plain array from .NET or wrapped API responses */
+  private extractArray(data: any): any[] {
+    if (Array.isArray(data)) return data;
+    if (data?.$values && Array.isArray(data.$values)) return data.$values;
+    if (data?.libraries && Array.isArray(data.libraries)) return data.libraries;
+    if (data?.items && Array.isArray(data.items)) return data.items;
+    if (data?.results && Array.isArray(data.results)) return data.results;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    return [];
+  }
 
   constructor() {
     // 1. Pull the URL from the environment variable as the "Source of Truth"
@@ -415,8 +426,8 @@ class KavitaAPI {
     this.username = username;
     this.password = password;
     await credentials.kavita.setServerUrl(this.serverUrl);
-    await credentials.kavita.setUsername(username);
-    await credentials.kavita.setPassword(password);
+    if (username) await credentials.kavita.setUsername(username);
+    if (password) await credentials.kavita.setPassword(password);
     if (apiKey) {
       await credentials.kavita.setApiKey(apiKey);
     }
@@ -440,7 +451,29 @@ class KavitaAPI {
     await credentials.kavita.clearAll();
   }
 
+  async validateApiKey(): Promise<boolean> {
+    try {
+      // Test API key by hitting a known endpoint; API key is passed as query param in proxy mode
+      const response = await this.client.get('/api/Library');
+      return response.status >= 200 && response.status < 300;
+    } catch (error: any) {
+      console.error('[KavitaAPI] API key validation failed:', error?.response?.status, error?.message);
+      return false;
+    }
+  }
+
   async login(): Promise<boolean> {
+    // If we already have a valid JWT token, we're authenticated
+    if (this.jwtToken) {
+      return true;
+    }
+
+    // If no username/password, we can't JWT login — but API key may still work
+    if (!this.username || !this.password) {
+      console.log('[KavitaAPI] No JWT credentials, skipping login');
+      return false;
+    }
+
     try {
       // New Kavita versions use JWT authentication via Account/login
       const response = await this.client.post('/api/Account/login', {
@@ -503,9 +536,9 @@ class KavitaAPI {
   isAuthenticated(): boolean { return !!this.jwtToken; }
 
   hasCredentials(): boolean {
-    // New JWT auth requires username/password; fallback to API key for older versions
-    if (this.proxyOrigin) return !!this.username && !!this.password;
-    return !!this.serverUrl && !!this.username && !!this.password;
+    // API key is the baseline requirement; JWT (username/password) is optional for progress tracking
+    if (this.proxyOrigin) return !!this.apiKey || (!!this.username && !!this.password);
+    return !!this.serverUrl && (!!this.apiKey || (!!this.username && !!this.password));
   }
 
   isProgressTrackingEnabled(): boolean {
@@ -541,9 +574,10 @@ class KavitaAPI {
           continue;
         }
 
-        if (Array.isArray(response.data) && response.data.length > 0) {
-          console.log('[KavitaAPI] Returning libraries:', response.data.length);
-          return response.data;
+        const data = this.extractArray(response.data);
+        if (data.length > 0) {
+          console.log('[KavitaAPI] Returning libraries:', data.length);
+          return data;
         }
       } catch (error: any) {
         console.warn(`[KavitaAPI] ${endpoint} failed:`, error.response?.status, error.message);
@@ -562,8 +596,9 @@ class KavitaAPI {
       console.log(`[KavitaAPI] ${KAVITA_ENDPOINTS.onDeck} response:`, response.status,
         Array.isArray(response.data) ? `${response.data.length} items` : typeof response.data);
 
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        response.data.forEach((series: any) => {
+      const data = this.extractArray(response.data);
+      if (data.length > 0) {
+        data.forEach((series: any) => {
           if (series.libraryId && !libraryMap.has(series.libraryId)) {
             libraryMap.set(series.libraryId, {
               id: series.libraryId,
@@ -621,6 +656,29 @@ class KavitaAPI {
     if (discoveredLibraries.length > 0) {
       console.log('[KavitaAPI] Discovered libraries from ID probing:', discoveredLibraries.length);
       return discoveredLibraries;
+    }
+
+    // Fallback 3: extract libraries from all series (guaranteed to work if series exist)
+    try {
+      console.log('[KavitaAPI] Fallback: extracting libraries from all series...');
+      const allSeries = await this.getAllSeries(0, 1000);
+      const seriesLibraryMap = new Map<number, Library>();
+      for (const series of allSeries) {
+        if (series.libraryId && !seriesLibraryMap.has(series.libraryId)) {
+          seriesLibraryMap.set(series.libraryId, {
+            id: series.libraryId,
+            name: series.libraryName || `Library ${series.libraryId}`,
+            type: 0,
+            series: 0
+          });
+        }
+      }
+      if (seriesLibraryMap.size > 0) {
+        console.log('[KavitaAPI] Extracted libraries from series:', seriesLibraryMap.size);
+        return Array.from(seriesLibraryMap.values());
+      }
+    } catch (e: any) {
+      console.warn('[KavitaAPI] Series-based library extraction failed:', e.message);
     }
 
     console.warn('[KavitaAPI] All library endpoints failed');
@@ -837,23 +895,43 @@ class KavitaAPI {
   // ── Metadata — genres & tags ─────────────────────────────────────────────────
 
   async getGenres(libraryId?: number): Promise<Genre[]> {
-    try {
-      const params = libraryId ? { libraryIds: libraryId } : {};
-      const response = await this.client.get('/api/Metadata/genres', { params });
-      return Array.isArray(response.data) ? response.data : [];
-    } catch {
-      return [];
+    const endpoints = ['/api/Metadata/genres', '/api/metadata/genres'];
+    for (const endpoint of endpoints) {
+      try {
+        const params = libraryId ? { libraryIds: libraryId } : {};
+        const response = await this.client.get(endpoint, { params });
+        const data = this.extractArray(response.data);
+        if (data.length > 0) return data;
+      } catch {}
+      // Try alternate param name
+      try {
+        const params = libraryId ? { libraryId } : {};
+        const response = await this.client.get(endpoint, { params });
+        const data = this.extractArray(response.data);
+        if (data.length > 0) return data;
+      } catch {}
     }
+    return [];
   }
 
   async getTags(libraryId?: number): Promise<Tag[]> {
-    try {
-      const params = libraryId ? { libraryIds: libraryId } : {};
-      const response = await this.client.get('/api/Metadata/tags', { params });
-      return Array.isArray(response.data) ? response.data : [];
-    } catch {
-      return [];
+    const endpoints = ['/api/Metadata/tags', '/api/metadata/tags'];
+    for (const endpoint of endpoints) {
+      try {
+        const params = libraryId ? { libraryIds: libraryId } : {};
+        const response = await this.client.get(endpoint, { params });
+        const data = this.extractArray(response.data);
+        if (data.length > 0) return data;
+      } catch {}
+      // Try alternate param name
+      try {
+        const params = libraryId ? { libraryId } : {};
+        const response = await this.client.get(endpoint, { params });
+        const data = this.extractArray(response.data);
+        if (data.length > 0) return data;
+      } catch {}
     }
+    return [];
   }
 
   async removeGenreFromAllSeries(genreId: number, onProgress?: (done: number, total: number) => void): Promise<void> {
@@ -879,21 +957,69 @@ class KavitaAPI {
   }
 
   async getSeriesByGenre(genreId: number, page = 0, pageSize = 30): Promise<Series[]> {
-    const response = await this.client.post('/api/Series/all', {
-      genres: [genreId],
-      pageNumber: page,
-      pageSize,
-    });
-    return response.data;
+    const endpoint = await this.getEndpointForType('series');
+
+    // Try old format first
+    try {
+      const response = await this.client.post(endpoint, {
+        genres: [genreId],
+        pageNumber: page,
+        pageSize,
+      });
+      if (Array.isArray(response.data)) return response.data;
+    } catch (oldErr: any) {
+      console.log('[KavitaAPI] Old genre filter failed:', oldErr.response?.status);
+    }
+
+    // Try FilterDto format (Kavita v0.8+)
+    try {
+      const response = await this.client.post(endpoint, {
+        statements: [{ field: 19, value: genreId.toString(), comparison: 0 }],
+        combination: 1,
+        sortOptions: { sortField: 1, isAscending: true },
+        limitTo: 0,
+        pageNumber: page,
+        pageSize,
+      });
+      if (Array.isArray(response.data)) return response.data;
+    } catch (filterErr: any) {
+      console.log('[KavitaAPI] FilterDto genre filter failed:', filterErr.response?.status);
+    }
+
+    return [];
   }
 
   async getSeriesByTag(tagId: number, page = 0, pageSize = 30): Promise<Series[]> {
-    const response = await this.client.post('/api/Series/all', {
-      tags: [tagId],
-      pageNumber: page,
-      pageSize,
-    });
-    return response.data;
+    const endpoint = await this.getEndpointForType('series');
+
+    // Try old format first
+    try {
+      const response = await this.client.post(endpoint, {
+        tags: [tagId],
+        pageNumber: page,
+        pageSize,
+      });
+      if (Array.isArray(response.data)) return response.data;
+    } catch (oldErr: any) {
+      console.log('[KavitaAPI] Old tag filter failed:', oldErr.response?.status);
+    }
+
+    // Try FilterDto format (Kavita v0.8+)
+    try {
+      const response = await this.client.post(endpoint, {
+        statements: [{ field: 20, value: tagId.toString(), comparison: 0 }],
+        combination: 1,
+        sortOptions: { sortField: 1, isAscending: true },
+        limitTo: 0,
+        pageNumber: page,
+        pageSize,
+      });
+      if (Array.isArray(response.data)) return response.data;
+    } catch (filterErr: any) {
+      console.log('[KavitaAPI] FilterDto tag filter failed:', filterErr.response?.status);
+    }
+
+    return [];
   }
 
   async addGenreToSeries(seriesId: number, genre: { id: number; title: string }): Promise<void> {
@@ -1065,27 +1191,32 @@ class KavitaAPI {
     // Image URLs must use apiKey param (JWT can't be passed in URL for img tags)
     const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
     const cacheBust = bustCache ? `&t=${Date.now()}` : '';
-    return `${this.serverUrl}/api/image/series-cover?seriesId=${seriesId}${params}${cacheBust}`;
+    const url = `${this.serverUrl}/api/image/series-cover?seriesId=${seriesId}${params}${cacheBust}`;
+    return this.proxyOrigin ? proxyUrl(url) : url;
   }
 
   getChapterCoverUrl(chapterId: number): string {
     const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
-    return `${this.serverUrl}/api/image/chapter-cover?chapterId=${chapterId}${params}`;
+    const url = `${this.serverUrl}/api/image/chapter-cover?chapterId=${chapterId}${params}`;
+    return this.proxyOrigin ? proxyUrl(url) : url;
   }
 
   getVolumeCoverUrl(volumeId: number): string {
     const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
-    return `${this.serverUrl}/api/image/volume-cover?volumeId=${volumeId}${params}`;
+    const url = `${this.serverUrl}/api/image/volume-cover?volumeId=${volumeId}${params}`;
+    return this.proxyOrigin ? proxyUrl(url) : url;
   }
 
   getLibraryCoverUrl(libraryId: number): string {
     const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
-    return `${this.serverUrl}/api/image/library-cover?libraryId=${libraryId}${params}`;
+    const url = `${this.serverUrl}/api/image/library-cover?libraryId=${libraryId}${params}`;
+    return this.proxyOrigin ? proxyUrl(url) : url;
   }
 
   getCollectionCoverUrl(collectionId: number): string {
     const params = this.apiKey ? `&apiKey=${encodeURIComponent(this.apiKey)}` : '';
-    return `${this.serverUrl}/api/image/collection-cover?collectionTagId=${collectionId}${params}`;
+    const url = `${this.serverUrl}/api/image/collection-cover?collectionTagId=${collectionId}${params}`;
+    return this.proxyOrigin ? proxyUrl(url) : url;
   }
 
   // ── Reader URLs ──────────────────────────────────────────────────────────────
