@@ -652,33 +652,40 @@ class KavitaAPI {
       }
     }
 
-    const discoveredLibraries = Array.from(libraryMap.values());
-    if (discoveredLibraries.length > 0) {
-      console.log('[KavitaAPI] Discovered libraries from ID probing:', discoveredLibraries.length);
-      return discoveredLibraries;
-    }
-
-    // Fallback 3: extract libraries from all series (guaranteed to work if series exist)
+    // Fallback 3: extract libraries from all series via direct endpoint call
+    // (Do NOT call getAllSeries() — it calls getLibraries() which would recurse)
     try {
       console.log('[KavitaAPI] Fallback: extracting libraries from all series...');
-      const allSeries = await this.getAllSeries(0, 1000);
-      const seriesLibraryMap = new Map<number, Library>();
-      for (const series of allSeries) {
-        if (series.libraryId && !seriesLibraryMap.has(series.libraryId)) {
-          seriesLibraryMap.set(series.libraryId, {
+      const endpoint = await this.getEndpointForType('series');
+
+      // Fetch a large batch of series without library filter
+      const response = await this.client.post(endpoint, {
+        pageNumber: 0,
+        pageSize: 1000,
+      });
+
+      const seriesData = Array.isArray(response.data) ? response.data : [];
+      console.log(`[KavitaAPI] Series fallback fetched ${seriesData.length} series`);
+
+      for (const series of seriesData) {
+        if (series.libraryId && !libraryMap.has(series.libraryId)) {
+          libraryMap.set(series.libraryId, {
             id: series.libraryId,
             name: series.libraryName || `Library ${series.libraryId}`,
-            type: 0,
+            type: typeof series.libraryType === 'number' ? series.libraryType : 0,
             series: 0
           });
+          console.log(`[KavitaAPI] Discovered library ${series.libraryId} from series: ${series.libraryName || 'Unknown'}`);
         }
-      }
-      if (seriesLibraryMap.size > 0) {
-        console.log('[KavitaAPI] Extracted libraries from series:', seriesLibraryMap.size);
-        return Array.from(seriesLibraryMap.values());
       }
     } catch (e: any) {
       console.warn('[KavitaAPI] Series-based library extraction failed:', e.message);
+    }
+
+    const finalLibraries = Array.from(libraryMap.values());
+    if (finalLibraries.length > 0) {
+      console.log('[KavitaAPI] Returning total discovered libraries:', finalLibraries.length);
+      return finalLibraries;
     }
 
     console.warn('[KavitaAPI] All library endpoints failed');
@@ -690,21 +697,29 @@ class KavitaAPI {
   async getSeriesForLibrary(libraryId: number, page = 0, pageSize = 30): Promise<Series[]> {
     console.log(`[KavitaAPI] getSeriesForLibrary(${libraryId}) called`);
 
-    // Use endpoint detection to find the working endpoint
-    const endpoint = await this.getEndpointForType('seriesByLibrary');
+    // The /api/Series/v2 endpoint ignores the libraries filter and returns ALL series.
+    // We fetch all series and filter client-side, then paginate.
+    const endpoint = await this.getEndpointForType('series');
 
     try {
       console.log(`[KavitaAPI] Using detected endpoint: ${endpoint}`);
       const response = await this.client.post(endpoint, {
-        libraryId,
-        pageNumber: page,
-        pageSize,
+        pageNumber: 0,
+        pageSize: 1000, // Fetch large batch to filter client-side
       });
-      console.log(`[KavitaAPI] ${endpoint} response:`, response.status,
-        Array.isArray(response.data) ? `${response.data.length} series` : typeof response.data);
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
+
+      const allSeries = Array.isArray(response.data) ? response.data : [];
+      console.log(`[KavitaAPI] ${endpoint} returned ${allSeries.length} total series`);
+
+      // Client-side filter by libraryId
+      const filtered = allSeries.filter((s: any) => s.libraryId === libraryId);
+      console.log(`[KavitaAPI] Filtered to ${filtered.length} series for library ${libraryId}`);
+
+      // Apply pagination client-side
+      const start = page * pageSize;
+      const paginated = filtered.slice(start, start + pageSize);
+      console.log(`[KavitaAPI] Returning page ${page} (${paginated.length} items)`);
+      return paginated;
     } catch (error: any) {
       console.warn(`[KavitaAPI] Detected endpoint ${endpoint} failed:`, error.response?.status, error.message);
     }
