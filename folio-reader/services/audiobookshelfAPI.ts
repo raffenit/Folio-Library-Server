@@ -259,8 +259,10 @@ class AudiobookshelfAPI {
         password,
       });
 
-      if (response.data?.token) {
-        this.jwtToken = response.data.token;
+      // ABS v2 returns token nested under user object: { user: { token: "..." } }
+      const token = response.data?.user?.token || response.data?.token;
+      if (token) {
+        this.jwtToken = token;
         this.username = username;
         this.password = password;
         this.setJwtHeader();

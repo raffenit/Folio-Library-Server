@@ -78,6 +78,25 @@ function handleProxy(req, res) {
   console.log(`[Proxy] Incoming headers:`, JSON.stringify(req.headers, null, 2));
 
   const target = url.parse(targetUrl);
+
+  // Translate localhost/127.0.0.1 to internal Docker service names.
+  // The frontend uses localhost (browser perspective), but inside the
+  // Docker container localhost means the container itself.
+  if (target.hostname === 'localhost' || target.hostname === '127.0.0.1') {
+    const port = target.port || '80';
+    const serviceMap = {
+      '8050': { host: 'kavita', port: '5000' },
+      '81':   { host: 'audiobookshelf', port: '80' },
+      '9000': { host: 'webhook-server', port: '9000' },
+    };
+    if (serviceMap[port]) {
+      console.log(`[Proxy] Translating ${target.hostname}:${port} → ${serviceMap[port].host}:${serviceMap[port].port}`);
+      target.hostname = serviceMap[port].host;
+      target.port = serviceMap[port].port;
+      target.host = `${serviceMap[port].host}:${serviceMap[port].port}`;
+    }
+  }
+
   const isHttps = target.protocol === 'https:';
   const transport = isHttps ? https : http;
 

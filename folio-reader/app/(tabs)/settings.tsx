@@ -427,8 +427,8 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
   }
 
   async function handleSave() {
-    if (!url.trim() || !key.trim() || !username.trim() || !password.trim()) {
-      setStatus('Server URL, API key, username, and password are required.');
+    if (!url.trim() || !key.trim()) {
+      setStatus('Server URL and API key are required.');
       setStatusOk(false);
       return;
     }
@@ -437,23 +437,37 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
     try {
       await absAPI.saveCredentials(url.trim(), key.trim());
       await absAPI.setProgressTrackingEnabled(progressTracking);
-      
-      // JWT login is now required for progress tracking
-      setStatus('Testing connection & logging in...');
-      const jwtSuccess = await absAPI.loginWithCredentials(username.trim(), password.trim());
-      if (!jwtSuccess) {
-        setStatusOk(false);
-        setStatus('JWT login failed. Check username/password.');
-        setTesting(false);
-        return;
+
+      // If username/password provided, try JWT login for progress tracking
+      const hasJwtCreds = username.trim() && password.trim();
+      if (hasJwtCreds) {
+        setStatus('Testing connection & logging in...');
+        const jwtSuccess = await absAPI.loginWithCredentials(username.trim(), password.trim());
+        if (!jwtSuccess) {
+          setStatusOk(false);
+          setStatus('JWT login failed. Check username/password.');
+          setTesting(false);
+          return;
+        }
+      } else {
+        // API key only — validate without login
+        setStatus('Testing connection...');
+        const apiOk = await absAPI.validateApiKey();
+        if (!apiOk) {
+          setStatusOk(false);
+          setStatus('API key validation failed. Check URL and API key.');
+          setTesting(false);
+          return;
+        }
       }
-      
+
       // Use getLibraries() instead of ping() — ping() bypasses the proxy and hits
       // the server directly, causing CORS failures on web. getLibraries() goes
       // through /dynamic-proxy?url= and also verifies the server is actually ABS.
       const libraries = await absAPI.getLibraries();
       setStatusOk(true);
-      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'} with progress tracking.`);
+      const trackingMsg = hasJwtCreds ? ' with progress tracking.' : '.';
+      setStatus(`Connected! Found ${libraries.length} librar${libraries.length === 1 ? 'y' : 'ies'}${trackingMsg}`);
       setTimeout(() => { onSuccess?.(); onClose(); }, 800);
     } catch (e: any) {
       setStatusOk(false);
