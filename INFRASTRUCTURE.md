@@ -1,91 +1,78 @@
-\# 📚 Media Server Manager (Docker + Caddy)
-
-
+# 📚 Media Server Manager (Docker + Caddy)
 
 This folder contains the core configuration for the home media server, providing access to Kavita and Audiobookshelf via a Caddy reverse proxy over Tailscale.
 
+## 🛠 Quick Commands
 
+Open a terminal in this folder to run these:
 
-\## 🛠 Quick Commands
+Start Servers:    `docker compose up -d`
 
+Stop Servers:     `docker compose down`
 
+Check Status:     `docker compose ps`
 
-Open PowerShell in this folder to run these:
+View Live Logs:   `docker compose logs -f`
 
+Update Apps:      `docker compose pull && docker compose up -d`
 
-
-Start Servers: 	docker-compose up -d
-
-Stop Servers: 	docker-compose down
-
-Check Status: 	docker-compose ps
-
-View Live Logs: docker-compose logs -f
-
-Update Apps: 	docker-compose pull \&\& docker-compose up -d
-
-Restart Caddy: 	docker-compose restart caddy
+Restart Caddy:    `docker compose restart caddy`
 
 
 
-\## 🌐 Access Points
+## 🌐 Access Points
 
 
 
-Kavita: http://100.104.199.67:8050
+Kavita: http://100.100.67.105:8050
 
-Audiobookshelf: http://100.104.199.67:81
+Audiobookshelf: http://100.100.67.105:81
+
+Folio PWA: http://100.100.67.105:3001
+
+Dockhand: http://100.100.67.105:8080
 
 Direct (Backup): localhost:5000 or localhost:13378
 
 
 
-\## 📂 Folder Structure \& Volumes
+## 📂 Folder Structure & Volumes
 
 
 
-The docker-compose.yml maps your D: Drive into the Linux containers. 
+The docker-compose.yml maps your library into the containers from `/mnt/media/Library/`.
 
 When adding libraries inside the apps, use these Internal Paths:
 
+### Kavita Volumes:
 
+`/mnt/media/Library/EBooks` ➔ `/Books/ebooks`
 
-\### Kavita Volumes: 
+`/mnt/media/Library/GraphicNovels` ➔ `/Books/graphicnovels`
 
+`/mnt/media/Library/Comics` ➔ `/Books/comics`
 
+`/mnt/media/Library/Manga` ➔ `/Books/manga`
 
-D:/Books/EBooks ➔ /ebooks
+Config stored in: `./kavita_data`
 
-D:/Books/GraphicNovels ➔ /graphicnovels
+### Audiobookshelf Volumes:
 
-D:/Books/Comics ➔ /comics
+`/mnt/media/Library/Audio/Audiobooks` ➔ `/audiobooks`
 
-Config stored in: ./kavita\_data
+`/mnt/media/Library/Audio/Podcasts` ➔ `/podcasts`
 
-
-
-\### Audiobookshelf Volumes:
-
-
-
-D:/Books/Audiobooks ➔ /audiobooksD:/Books/Podcasts ➔ /podcasts
-
-Config stored in: ./abs\_config and ./abs\_metadata
+Config stored in: `./abs_config` and `./abs_metadata`
 
 
 
-\## ⚠️ Maintenance Reminders
+## ⚠️ Maintenance Reminders
 
 
 
-* Caddyfile Changes: If you edit the Caddyfile, you must run 
-
-docker-compose restart caddy 
-
-for changes to take effect.
-
-* Port Conflicts: If you get a "Bind for 0.0.0.0:8050 failed" error, check Task Manager for any "zombie" caddy.exe processes or other apps using that port.
-* Tailscale: Ensure Tailscale is running on this host machine, or the 100.x.x.x IPs will not resolve from other devices.
+* **Caddyfile Changes:** If you edit the Caddyfile, run `docker compose restart caddy` for changes to take effect.
+* **Port Conflicts:** If you get a "Bind for 0.0.0.0:8050 failed" error, check for existing processes with `sudo ss -tlnp | grep 8050`.
+* **Tailscale:** Ensure Tailscale is running on this host machine, or the 100.x.x.x IPs will not resolve from other devices.
 
 
 

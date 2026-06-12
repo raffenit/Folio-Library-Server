@@ -4,8 +4,9 @@
 
 | Software | Version | Notes | Last Updated |
 |----------|---------|-------|--------------|
-| Tailscale | 1.98.2 | Windows client, auto-update enabled | 2026-05-17 |
-| Docker Desktop | ? | Windows with WSL2 backend | |
+| Tailscale | latest | Fedora server, auto-update enabled | |
+| Docker Engine | latest | Fedora via official repo, rootless mode optional | |
+| dnf5 | latest | Fedora 44 default package manager | |
 | Caddy | 2-alpine | Via Docker image tag | |
 
 ## Backend Services
@@ -20,6 +21,7 @@
 | Software | Version | Notes | Last Updated |
 |----------|---------|-------|--------------|
 | Node.js | 20 | Alpine-based Docker images | |
+| Plex | latest | Docker `plexinc/pms-docker`, host networking | |
 
 ## APIs
 
@@ -27,6 +29,7 @@
 |-----|---------------------|-------|--------------|
 | Kavita API | v1 | `http://localhost:8050/api` | |
 | Audiobookshelf API | v1 | `http://localhost:13378/api` | |
+| Folio PWA | | `http://100.100.67.105:3001` | |
 
 ---
 

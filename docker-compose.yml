@@ -4,10 +4,10 @@ services:
     container_name: kavita
     volumes:
       - ./kavita_data:/kavita/config:rw
-      - D:/Library/EBooks:/Books/ebooks:rw
-      - D:/Library/GraphicNovels:/Books/graphicnovels:rw
-      - D:/Library/Comics:/Books/comics:rw
-      - D:/Library/Manga:/Books/manga:rw
+      - /mnt/media/Library/EBooks:/Books/ebooks:rw
+      - /mnt/media/Library/GraphicNovels:/Books/graphicnovels:rw
+      - /mnt/media/Library/Comics:/Books/comics:rw
+      - /mnt/media/Library/Manga:/Books/manga:rw
     restart: unless-stopped
     networks:
       - media-network
@@ -18,8 +18,8 @@ services:
     volumes:
       - ./abs_config:/config:rw
       - ./abs_metadata:/metadata:rw
-      - D:/Library/Audio/Audiobooks:/audiobooks:rw
-      - D:/Library/Audio/Podcasts:/podcasts:rw
+      - /mnt/media/Library/Audio/Audiobooks:/audiobooks:rw
+      - /mnt/media/Library/Audio/Podcasts:/podcasts:rw
     restart: unless-stopped
     networks:
       - media-network
@@ -75,6 +75,17 @@ services:
       - .:/repo
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
+    restart: unless-stopped
+    networks:
+      - media-network
+
+  dockhand:
+    image: fnsys/dockhand:latest
+    container_name: dockhand
+    ports:
+      - "8080:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
     networks:
       - media-network

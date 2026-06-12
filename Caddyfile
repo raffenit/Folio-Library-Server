@@ -5,7 +5,7 @@
 # Caddy proxies external requests to internal containers.
 
 # ── Kavita E-book Server ─────────────────────────────────────────────────────
-# Access at: http://localhost:8050 or http://100.104.199.67:8050
+# Access at: http://localhost:8050 or http://100.100.67.105:8050
 :8050 {
     reverse_proxy kavita:5000
 
@@ -26,7 +26,7 @@
 }
 
 # ── Audiobookshelf Server ────────────────────────────────────────────────────
-# Access at: http://localhost:81 or http://100.104.199.67:81
+# Access at: http://localhost:81 or http://100.100.67.105:81
 :81 {
     reverse_proxy audiobookshelf:80
 
@@ -47,7 +47,7 @@
 }
 
 # ── Folio PWA (with proxy features) ─────────────────────────────────────────
-# Access at: http://localhost:3001 or http://100.104.199.67:3001
+# Access at: http://localhost:3001 or http://100.100.67.105:3001
 # Note: /dynamic-proxy is handled by Folio's built-in server.js proxy
 :3001 {
     # CORS preflight — must be first
@@ -86,5 +86,12 @@
         Access-Control-Allow-Headers "*"
     }
 
+    encode gzip
+}
+
+# ── Dockhand Container Manager ───────────────────────────────────────────────
+# Access at: http://localhost:8080 or http://100.100.67.105:8080
+:8080 {
+    reverse_proxy dockhand:3000
     encode gzip
 }

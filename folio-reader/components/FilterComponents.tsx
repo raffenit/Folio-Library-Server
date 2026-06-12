@@ -3,11 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, Platform, GestureResponderEve
 import { useTheme } from '../contexts/ThemeContext';
 import { Typography, Spacing, Radius, getButtonGradient } from '../constants/theme';
 
-// ── Constants for consistent styling ──
+// ─── Constants for consistent styling ───
 // Note: These are derived from theme colors.textOnAccent and colors.overlay
 // Kept as constants for consistency across FilterComponents
 
-// ── Gradient Chip Component ──
+// ─── Gradient Chip Component ───
 interface GradientChipProps {
   label: string;
   active: boolean;
@@ -71,7 +71,7 @@ export function GradientChip({ label, active, onPress, onContextMenu }: Gradient
   );
 }
 
-// ── Filter Row with Label ──
+// ─── Filter Row with Label ──
 interface FilterRowProps<T> {
   label: string;
   items: T[];
@@ -163,7 +163,7 @@ export function FilterRow<T extends { id: string | number }>({
   );
 }
 
-// ── Filter Tab Button ──
+// ─── Filter Tab Button ──
 interface FilterTabProps {
   label: string;
   active: boolean;
@@ -216,7 +216,7 @@ export function FilterTab({ label, active, onPress, isFirst, isLast, showTopBord
   );
 }
 
-// ── Filter Row without Label ──
+// ─── Filter Row without Label ──
 interface FilterRowNoLabelProps<T> {
   items: T[];
   selectedId: string | number | null;
@@ -270,7 +270,7 @@ export function FilterRowNoLabel<T extends { id: string | number }>({
   );
 }
 
-// ── Compact Filter Row ──
+// ─── Compact Filter Row ──
 interface CompactFilterRowProps {
   label: string;
   items: { id: string | number; title: string }[];
@@ -353,7 +353,7 @@ export function CompactFilterRow({ label, items, selectedId, onSelect }: Compact
   );
 }
 
-// ── Complete Filter Section with Tabs ──
+// ─── Complete Filter Section with Tabs ──
 type FilterType = 'library' | 'genre' | 'author' | 'tag' | 'collection';
 
 interface FilterSectionProps<T extends { id: string | number; title: string }> {

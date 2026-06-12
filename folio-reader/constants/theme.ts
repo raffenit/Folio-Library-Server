@@ -1,3 +1,5 @@
+// ─── Types & Interfaces ─────────────────────────────────────────────────────
+
 export interface ColorScheme {
   background: string;
   surface: string;
@@ -30,6 +32,8 @@ export interface ColorScheme {
  * instead of hardcoding. Could use hue rotation: purple = accent hue - 30°, pink = accent hue - 60°
  * Or use a color manipulation library like chroma.js or colord
  */
+// ─── Gradient Helpers ─────────────────────────────────────────────────────
+
 export function getRainbowGradient(colors: ColorScheme, angle: number = 135): string {
   return `linear-gradient(${angle}deg, ${colors.accent} 0%, ${colors.secondary} 40%, #8B6DB8 70%, #A85A95 100%)`;
 }
@@ -73,6 +77,8 @@ export interface CustomFont {
 }
 
 // Placeholder custom theme — replaced at runtime by ThemeContext
+// ─── Theme Definitions ────────────────────────────────────────────────────
+
 export const defaultCustomTheme: ColorScheme = {
   background: '#0d0d12',
   surface: '#16161f',
@@ -238,6 +244,8 @@ export const themes: Record<ThemeName, ColorScheme> = {
   },
   custom: defaultCustomTheme,
 };
+
+// ─── Labels & Metadata ────────────────────────────────────────────────────
 
 export const themeLabels: Record<ThemeName, string> = {
   midnight: 'Midnight',
@@ -454,6 +462,8 @@ export const themeModeLabels: Record<ThemeMode, string> = {
  * Resolve the actual theme colors based on theme name and mode.
  * When mode is 'auto', it uses the system's color scheme preference.
  */
+// ─── Theme Resolution ─────────────────────────────────────────────────────
+
 export function resolveTheme(
   themeName: ThemeName,
   mode: ThemeMode,
@@ -521,6 +531,8 @@ const GENRE_HUES = [25, 45, 170, 200, 270, 310, 340];
  * Generate a soft gradient color set for genre/tag chips with consistent brightness.
  * Uses HSL color space for perceptually uniform lightness.
  */
+// ─── Utility Functions ────────────────────────────────────────────────────
+
 export function getGenreChipColors(name: string): {
   gradientStart: string;
   gradientEnd: string;
