@@ -3,11 +3,15 @@ import { storage } from '../services/storage';
 import { autoBackup } from '../services/backup';
 import { Platform } from 'react-native';
 
+// ─── Types & Constants ────────────────────────────────────────────────────
+
 const PROFILES_KEY = 'folio_profiles_v1';
 const ACTIVE_PROFILE_KEY = 'folio_active_profile_id';
 const DEVICE_ID_KEY = 'folio_device_id';
 const SYNC_SERVER_URL_KEY = 'folio_sync_server_url';
 const SYNC_API_KEY_KEY = 'folio_sync_api_key';
+
+// ─── Helper Functions ─────────────────────────────────────────────────────
 
 // Generate or load device ID
 async function getOrCreateDeviceId(): Promise<string> {
@@ -54,6 +58,8 @@ const PROFILE_COLORS = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
   '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9'
 ];
+
+// ─── ProfileProvider Component ──────────────────────────────────────────────
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -134,7 +140,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Cloud sync functions
+  // ─── Cloud Sync Functions ───────────────────────────────────────────
+
   const setSyncCredentials = async (url: string, apiKey: string) => {
     console.log('[ProfileContext] Saving sync credentials...', { url, apiKeyPrefix: apiKey.substring(0, 4) + '...' });
     try {
@@ -274,6 +281,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     // Trigger auto-backup check after profile changes
     await autoBackup();
   };
+
+  // ─── Profile CRUD Operations ────────────────────────────────────────
 
   const selectProfile = useCallback(async (profileId: string | null, profilesList?: Profile[]) => {
     // Use provided profiles list (for when called with fresh data) or fall back to state
@@ -494,6 +503,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     </ProfileContext.Provider>
   );
 }
+
+// ─── Export Hook ───────────────────────────────────────────────────────────
 
 export function useProfile() {
   const context = useContext(ProfileContext);

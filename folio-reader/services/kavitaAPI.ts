@@ -5,11 +5,13 @@ import { storage } from './storage';
 import { PROXY_PATH, isProxied, extractTargetUrl, proxyUrl } from '@/config/proxy';
 import { credentials, STORAGE_KEYS } from '@/config/credentials';
 
+// ─── Types & Interfaces ─────────────────────────────────────────────────────
+
 /**
  * Dynamic Universal Tunnel Logic
  * Instead of hardcoding proxy URLs, we now stick to the user's original server URL
  * for everything, and only tunnel through the local origin when Bypass CORS is enabled.
- * 
+ *
  * Credentials are managed centrally via @/config/credentials
  */
 
@@ -174,6 +176,8 @@ export function chapterEffectiveFormat(chapter: Chapter): number {
   return best?.format ?? chapter.files?.[0]?.format ?? 0;
 }
 
+// ─── KavitaAPI Class ────────────────────────────────────────────────────────
+
 class KavitaAPI {
   private client: AxiosInstance;
   private serverUrl: string = '';
@@ -195,6 +199,20 @@ class KavitaAPI {
     if (data?.results && Array.isArray(data.results)) return data.results;
     if (data?.data && Array.isArray(data.data)) return data.data;
     return [];
+  }
+
+  /** Check if a JWT token has expired by decoding its payload */
+  private isJwtExpired(token: string): boolean {
+    try {
+      const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const pad = 4 - (base64.length % 4);
+      const padded = base64 + (pad < 4 ? '='.repeat(pad) : '');
+      const payload = JSON.parse(atob(padded));
+      if (payload.exp) return Date.now() >= payload.exp * 1000;
+      return false;
+    } catch {
+      return true;
+    }
   }
 
   constructor() {
@@ -252,9 +270,8 @@ class KavitaAPI {
         config.url = this.proxyOrigin + encodeURIComponent(fullTarget);
         config.baseURL = '';
         config.params = undefined;
+        config.headers = config.headers || {};
         if (this.jwtToken) {
-          // Ensure headers object exists before setting Authorization
-          config.headers = config.headers || {};
           config.headers.Authorization = `Bearer ${this.jwtToken}`;
           console.log(`[Kavita Proxy] Added JWT auth header: Bearer ${this.jwtToken.substring(0, 20)}...`);
         } else if (this.apiKey) {
@@ -279,6 +296,22 @@ class KavitaAPI {
       }
       return config;
     });
+
+    // Response interceptor: on 401, clear expired JWT and retry with API key
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalConfig = error.config;
+        if (error.response?.status === 401 && this.jwtToken && !originalConfig?._kavitaRetry) {
+          console.log('[KavitaAPI] JWT rejected (401), clearing token and retrying with API key');
+          this.jwtToken = '';
+          delete this.client.defaults.headers.common['Authorization'];
+          originalConfig._kavitaRetry = true;
+          return this.client(originalConfig);
+        }
+        return Promise.reject(error);
+      }
+    );
   } // end constructor
 
   setProxy(origin: string | null) {
@@ -310,8 +343,15 @@ class KavitaAPI {
         const storedJwt = await credentials.kavita.getJwtToken();
         console.log('[KavitaAPI] Initialize - JWT:', storedJwt ? `present (${storedJwt.substring(0, 20)}...)` : 'missing');
         if (storedJwt) {
-          this.jwtToken = storedJwt;
-          this.client.defaults.headers.common['Authorization'] = `Bearer ${this.jwtToken}`;
+          if (this.isJwtExpired(storedJwt)) {
+            console.log('[KavitaAPI] Stored JWT expired, clearing and will re-authenticate');
+            this.jwtToken = '';
+            await credentials.kavita.setJwtToken('');
+            delete this.client.defaults.headers.common['Authorization'];
+          } else {
+            this.jwtToken = storedJwt;
+            this.client.defaults.headers.common['Authorization'] = `Bearer ${this.jwtToken}`;
+          }
         }
       }
     } catch (e) {
@@ -452,19 +492,29 @@ class KavitaAPI {
   }
 
   async validateApiKey(): Promise<boolean> {
+    // Temporarily bypass JWT so the API key is tested directly
+    const savedJwt = this.jwtToken;
+    this.jwtToken = '';
     try {
-      // Test API key by hitting a known endpoint; API key is passed as query param in proxy mode
       const response = await this.client.get('/api/Library');
+      // API key works — keep JWT cleared if it was expired, otherwise restore it
+      if (savedJwt && !this.isJwtExpired(savedJwt)) {
+        this.jwtToken = savedJwt;
+      }
       return response.status >= 200 && response.status < 300;
     } catch (error: any) {
       console.error('[KavitaAPI] API key validation failed:', error?.response?.status, error?.message);
+      // Only restore JWT if it's still valid; otherwise leave it cleared
+      if (savedJwt && !this.isJwtExpired(savedJwt)) {
+        this.jwtToken = savedJwt;
+      }
       return false;
     }
   }
 
   async login(): Promise<boolean> {
-    // If we already have a valid JWT token, we're authenticated
-    if (this.jwtToken) {
+    // If we already have a valid (non-expired) JWT token, we're authenticated
+    if (this.jwtToken && !this.isJwtExpired(this.jwtToken)) {
       return true;
     }
 
@@ -1312,5 +1362,7 @@ class KavitaAPI {
     }
   }
 }
+
+// ─── Export Singleton ───────────────────────────────────────────────────────
 
 export const kavitaAPI = new KavitaAPI();

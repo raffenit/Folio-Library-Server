@@ -20,6 +20,8 @@ import { credentials, STORAGE_KEYS } from '@/config/credentials';
  * /docs/AUDIOBOOKSHELF_API.md
  */
 
+// ─── Types & Interfaces ─────────────────────────────────────────────────────
+
 /**
  * Dynamic Universal Tunnel Logic
  * Tunneling via local origin when Bypass CORS is enabled.
@@ -98,6 +100,8 @@ export interface ABSAudioTrack {
   contentUrl: string;  // relative path — prepend serverUrl
   mimeType: string;
 }
+
+// ─── AudiobookshelfAPI Class ───────────────────────────────────────────────
 
 class AudiobookshelfAPI {
   private client: AxiosInstance;
@@ -701,5 +705,7 @@ class AudiobookshelfAPI {
     }
   }
 }
+
+// ─── Export Singleton ───────────────────────────────────────────────────────
 
 export const absAPI = new AudiobookshelfAPI();

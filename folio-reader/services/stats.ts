@@ -3,6 +3,8 @@ import { storage } from './storage';
 const STATS_KEY = 'folio_reading_stats_v1';
 const GOALS_KEY = 'folio_reading_goals_v1';
 
+// ─── Types & Interfaces ────────────────────────────────────────────────────
+
 export type ReadingFormat = 'ebook' | 'audiobook' | 'both';
 
 export interface ReadingSession {
@@ -91,6 +93,8 @@ export interface AggregatedStats {
   personality: ReaderPersonalityResult;
 }
 
+// ─── Storage Functions ─────────────────────────────────────────────────────
+
 export async function loadStats(): Promise<ReadingStats> {
   const data = await storage.getItem(STATS_KEY);
   if (!data) {
@@ -125,6 +129,8 @@ export async function loadGoals(): Promise<ReadingGoals> {
 export async function saveGoals(goals: ReadingGoals): Promise<void> {
   await storage.setItem(GOALS_KEY, JSON.stringify(goals));
 }
+
+// ─── Session Management ────────────────────────────────────────────────────
 
 // Start a new reading session
 export async function startReadingSession(
@@ -191,6 +197,8 @@ export async function finishBook(bookId: string): Promise<void> {
   
   await saveStats(stats);
 }
+
+// ─── Statistics Calculation ─────────────────────────────────────────────────
 
 // Calculate all aggregated statistics
 export async function calculateAggregatedStats(): Promise<AggregatedStats> {
@@ -553,6 +561,8 @@ function calculatePersonality(inputs: PersonalityInputs): ReaderPersonalityResul
     secondaryTrait: secondary,
   };
 }
+
+// ─── Utility Functions ─────────────────────────────────────────────────────
 
 // Format minutes as "Xh Ym" or "Xm"
 export function formatDuration(minutes: number): string {
