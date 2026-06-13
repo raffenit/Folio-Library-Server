@@ -23,12 +23,23 @@ git add -A
 echo "Committing with message: $MESSAGE"
 git commit -m "$MESSAGE"
 
-# Check if there's a remote
+BRANCH=$(git branch --show-current)
+
+# Push to GitHub remote
 if git remote -v > /dev/null 2>&1 && [[ -n "$(git remote)" ]]; then
-    echo "Pushing to remote..."
-    git push
+    echo "Pushing to GitHub remote..."
+    git push origin "$BRANCH"
 else
-    echo "No remote configured. Commit saved locally."
+    echo "No remote configured."
+fi
+
+# Push to local backup
+BACKUP="/mnt/media/Backups/folio-library-server.git"
+if [[ -d "$BACKUP" ]]; then
+    echo "Pushing to local backup..."
+    git push "$BACKUP" "$BRANCH"
+else
+    echo "Local backup not found at $BACKUP"
 fi
 
 echo "Done!"
