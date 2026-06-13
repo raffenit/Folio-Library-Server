@@ -95,3 +95,10 @@
     reverse_proxy dockhand:3000
     encode gzip
 }
+
+# ── n8n Workflow Automation ──────────────────────────────────────────────────
+# Access at: http://localhost:5679 or http://100.100.67.105:5679
+:5679 {
+    reverse_proxy n8n:5678
+    encode gzip
+}

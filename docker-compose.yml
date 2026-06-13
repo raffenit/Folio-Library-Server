@@ -24,21 +24,6 @@ services:
     networks:
       - media-network
 
-  caddy:
-    image: caddy:latest
-    container_name: caddy
-    ports:
-      - "8050:8050"    # Kavita
-      - "81:81"        # Audiobookshelf
-      - "3001:3001"    # Folio
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data:rw
-      - caddy_config:/config:rw
-    restart: unless-stopped
-    networks:
-      - media-network
-
   folio:
     build:
       context: ./folio-reader
@@ -90,10 +75,6 @@ services:
     networks:
       - media-network
 
-volumes:
-  caddy_data:
-  caddy_config:
-
 networks:
   media-network:
-    driver: bridge
+    external: true

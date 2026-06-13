@@ -1,12 +1,24 @@
 # 📚 Media Server Manager (Docker + Caddy)
 
-This folder contains the core configuration for the home media server, providing access to Kavita and Audiobookshelf via a Caddy reverse proxy over Tailscale.
+This folder contains the core configuration for the home media server, providing access to Kavita, Audiobookshelf, Folio, Dockhand, and n8n via a Caddy reverse proxy over Tailscale.
 
 ## 🛠 Quick Commands
 
 Open a terminal in this folder to run these:
 
-Start Servers:    `docker compose up -d`
+**Start everything (from `docker-files/`):**
+
+```bash
+./start-all.sh
+```
+
+**Or manually:**
+
+```bash
+cd ../infrastructure && docker compose up -d
+cd ../Folio-Library-Server && docker compose up -d
+cd ../ai-smart-home && docker compose up -d
+```
 
 Stop Servers:     `docker compose down`
 
@@ -15,8 +27,6 @@ Check Status:     `docker compose ps`
 View Live Logs:   `docker compose logs -f`
 
 Update Apps:      `docker compose pull && docker compose up -d`
-
-Restart Caddy:    `docker compose restart caddy`
 
 
 
@@ -31,6 +41,8 @@ Audiobookshelf: http://100.100.67.105:81
 Folio PWA: http://100.100.67.105:3001
 
 Dockhand: http://100.100.67.105:8080
+
+n8n (Workflows): http://100.100.67.105:5679
 
 Direct (Backup): localhost:5000 or localhost:13378
 
@@ -70,7 +82,7 @@ Config stored in: `./abs_config` and `./abs_metadata`
 
 
 
-* **Caddyfile Changes:** If you edit the Caddyfile, run `docker compose restart caddy` for changes to take effect.
+* **Caddyfile Changes:** If you edit the Caddyfile, restart Caddy from the `infrastructure/` stack: `cd ../infrastructure && docker compose restart caddy`
 * **Port Conflicts:** If you get a "Bind for 0.0.0.0:8050 failed" error, check for existing processes with `sudo ss -tlnp | grep 8050`.
 * **Tailscale:** Ensure Tailscale is running on this host machine, or the 100.x.x.x IPs will not resolve from other devices.
 
