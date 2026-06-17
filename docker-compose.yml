@@ -67,10 +67,9 @@ services:
   dockhand:
     image: fnsys/dockhand:latest
     container_name: dockhand
-    ports:
-      - "8080:3000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./dockhand_data:/app/data
     restart: unless-stopped
     networks:
       - media-network
