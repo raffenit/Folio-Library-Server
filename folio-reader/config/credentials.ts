@@ -190,27 +190,30 @@ export const credentials = {
    */
   kavita: {
     async getServerUrl(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.KAVITA.URL, 'KAVITA_URL') ||
+      return await storage.getItem(STORAGE_KEYS.KAVITA.SERVER_URL) ||
+             getEnvMulti(ENV_VARS.KAVITA.URL, 'KAVITA_URL') ||
              buildUrlFromPort('KAVITA_PORT') ||
-             await storage.getItem(STORAGE_KEYS.KAVITA.SERVER_URL);
+             null;
     },
-    
+
     async setServerUrl(url: string): Promise<void> {
       await storage.setItem(STORAGE_KEYS.KAVITA.SERVER_URL, url);
     },
-    
+
     async getApiKey(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.KAVITA.API_KEY, 'KAVITA_API_KEY') ||
-             await storage.getItem(STORAGE_KEYS.KAVITA.API_KEY);
+      return await storage.getItem(STORAGE_KEYS.KAVITA.API_KEY) ||
+             getEnvMulti(ENV_VARS.KAVITA.API_KEY, 'KAVITA_API_KEY') ||
+             null;
     },
-    
+
     async setApiKey(key: string): Promise<void> {
       await storage.setItem(STORAGE_KEYS.KAVITA.API_KEY, key);
     },
 
     async getUsername(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.KAVITA.USERNAME, 'KAVITA_JWT_USERNAME', 'KAVITA_USERNAME') ||
-             await storage.getItem(STORAGE_KEYS.KAVITA.USERNAME);
+      return await storage.getItem(STORAGE_KEYS.KAVITA.USERNAME) ||
+             getEnvMulti(ENV_VARS.KAVITA.USERNAME, 'KAVITA_JWT_USERNAME', 'KAVITA_USERNAME') ||
+             null;
     },
 
     async setUsername(username: string): Promise<void> {
@@ -218,8 +221,9 @@ export const credentials = {
     },
 
     async getPassword(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.KAVITA.PASSWORD, 'KAVITA_JWT_PASSWORD', 'KAVITA_PASSWORD') ||
-             await storage.getItem(STORAGE_KEYS.KAVITA.PASSWORD);
+      return await storage.getItem(STORAGE_KEYS.KAVITA.PASSWORD) ||
+             getEnvMulti(ENV_VARS.KAVITA.PASSWORD, 'KAVITA_JWT_PASSWORD', 'KAVITA_PASSWORD') ||
+             null;
     },
 
     async setPassword(password: string): Promise<void> {
@@ -264,36 +268,40 @@ export const credentials = {
    */
   abs: {
     async getServerUrl(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.ABS.URL, 'ABS_URL') ||
+      return await storage.getItem(STORAGE_KEYS.ABS.SERVER_URL) ||
+             getEnvMulti(ENV_VARS.ABS.URL, 'ABS_URL') ||
              buildUrlFromPort('ABS_PORT') ||
-             await storage.getItem(STORAGE_KEYS.ABS.SERVER_URL);
+             null;
     },
-    
+
     async setServerUrl(url: string): Promise<void> {
       await storage.setItem(STORAGE_KEYS.ABS.SERVER_URL, url);
     },
-    
+
     async getApiKey(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.ABS.API_KEY, 'ABS_API_KEY') ||
-             await storage.getItem(STORAGE_KEYS.ABS.API_KEY);
+      return await storage.getItem(STORAGE_KEYS.ABS.API_KEY) ||
+             getEnvMulti(ENV_VARS.ABS.API_KEY, 'ABS_API_KEY') ||
+             null;
     },
-    
+
     async setApiKey(key: string): Promise<void> {
       await storage.setItem(STORAGE_KEYS.ABS.API_KEY, key);
     },
-    
+
     async getUsername(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.ABS.USERNAME, 'ABS_JWT_USERNAME', 'ABS_USERNAME') ||
-             await storage.getItem(STORAGE_KEYS.ABS.USERNAME);
+      return await storage.getItem(STORAGE_KEYS.ABS.USERNAME) ||
+             getEnvMulti(ENV_VARS.ABS.USERNAME, 'ABS_JWT_USERNAME', 'ABS_USERNAME') ||
+             null;
     },
-    
+
     async setUsername(username: string): Promise<void> {
       await storage.setItem(STORAGE_KEYS.ABS.USERNAME, username);
     },
-    
+
     async getPassword(): Promise<string | null> {
-      return getEnvMulti(ENV_VARS.ABS.PASSWORD, 'ABS_JWT_PASSWORD', 'ABS_PASSWORD') ||
-             await storage.getItem(STORAGE_KEYS.ABS.PASSWORD);
+      return await storage.getItem(STORAGE_KEYS.ABS.PASSWORD) ||
+             getEnvMulti(ENV_VARS.ABS.PASSWORD, 'ABS_JWT_PASSWORD', 'ABS_PASSWORD') ||
+             null;
     },
     
     async setPassword(password: string): Promise<void> {
