@@ -167,7 +167,8 @@ class AudiobookshelfAPI {
           merged.set('token', this.apiKey);
         }
 
-        const fullTarget = `${rawTargetBase}${cleanPath}?${merged.toString()}`;
+        const queryString = merged.toString();
+        const fullTarget = queryString ? `${rawTargetBase}${cleanPath}?${queryString}` : `${rawTargetBase}${cleanPath}`;
 
         if (__DEV__) {
           console.log(`[ABS Proxy] ${config.method?.toUpperCase()} ${fullTarget}`);
@@ -208,16 +209,26 @@ class AudiobookshelfAPI {
 
       if (storedUrl) {
         this.setServer(storedUrl, storedKey || '');
-        
+
         // Restore JWT if available
         if (storedJwt) {
           this.jwtToken = storedJwt;
           this.setJwtHeader();
         }
-        
+
         // Restore username/password for JWT login
         if (storedUsername) this.username = storedUsername;
         if (storedPassword) this.password = storedPassword;
+
+        // Attempt JWT login if we have credentials but no token
+        // (token may have expired or login previously failed)
+        if (!this.jwtToken && this.username && this.password) {
+          try {
+            await this.loginWithCredentials(this.username, this.password);
+          } catch {
+            // Non-blocking: progress tracking will be unavailable but API key still works
+          }
+        }
       }
     } catch (e) {
       console.error('Failed to initialize AudiobookshelfAPI', e);
