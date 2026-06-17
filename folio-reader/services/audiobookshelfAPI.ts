@@ -395,14 +395,6 @@ class AudiobookshelfAPI {
     // Use /api/libraries instead of /ping because /api/ paths go through the proxy
     // /ping doesn't contain /api/ so it bypasses proxy and causes CORS issues on web
     try {
-      // If we have JWT credentials but no token yet, try to login first
-      if (!this.jwtToken && this.username && this.password) {
-        const loginSuccess = await this.loginWithCredentials(this.username, this.password);
-        if (!loginSuccess) {
-          return false;
-        }
-      }
-      
       await this.client.get('/api/libraries');
       return true;
     } catch {
