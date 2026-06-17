@@ -162,21 +162,20 @@ function KavitaConfigModal({ visible, onClose, onSuccess }: { visible: boolean; 
         return;
       }
 
-      // If username/password provided, try JWT login for progress tracking.
-      // If JWT login fails, we still keep the API key connection but without
-      // progress tracking, and clear stale stored credentials.
+      // Persist username/password regardless of login success so the user
+      // doesn't lose them on a transient failure. Only clear on explicit disconnect.
       const hasJwtCreds = username.trim() && password.trim();
+      if (hasJwtCreds) {
+        await credentials.kavita.setUsername(username.trim());
+        await credentials.kavita.setPassword(password.trim());
+      }
+
+      // Try JWT login for progress tracking.
       let jwtSuccess = false;
       if (hasJwtCreds) {
         setStatus('Testing connection & logging in...');
         jwtSuccess = await kavitaAPI.login();
         console.log('[KavitaModal] Login result:', jwtSuccess);
-        if (!jwtSuccess) {
-          // Clear stale stored credentials so future sessions don't retry bad JWT
-          await credentials.kavita.setUsername('');
-          await credentials.kavita.setPassword('');
-          await credentials.kavita.setJwtToken('');
-        }
       }
 
       setStatus('Fetching libraries...');
@@ -465,20 +464,19 @@ function ABSConfigModal({ visible, onClose, onSuccess }: { visible: boolean; onC
         return;
       }
 
-      // If username/password provided, try JWT login for progress tracking.
-      // If JWT login fails, we still keep the API key connection but without
-      // progress tracking, and clear stale stored credentials.
+      // Persist username/password regardless of login success so the user
+      // doesn't lose them on a transient failure. Only clear on explicit disconnect.
       const hasJwtCreds = username.trim() && password.trim();
+      if (hasJwtCreds) {
+        await credentials.abs.setUsername(username.trim());
+        await credentials.abs.setPassword(password.trim());
+      }
+
+      // Try JWT login for progress tracking.
       let jwtSuccess = false;
       if (hasJwtCreds) {
         setStatus('Testing connection & logging in...');
         jwtSuccess = await absAPI.loginWithCredentials(username.trim(), password.trim());
-        if (!jwtSuccess) {
-          // Clear stale stored credentials so future sessions don't retry bad JWT
-          await credentials.abs.setUsername('');
-          await credentials.abs.setPassword('');
-          await credentials.abs.setJwtToken('');
-        }
       }
 
       // Use getLibraries() instead of ping() — ping() bypasses the proxy and hits
