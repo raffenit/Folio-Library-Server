@@ -285,11 +285,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const stop = useCallback(async () => {
     const np = nowPlayingRef.current;
     const itemId = np?.item.id;
-    if (np?.session) {
-      // Broadcast stop early so UI can react immediately, or wait for close?
-      // Waiting ensures server has processed the final sync.
-      await absAPI.closeSession(np.session.id, player.currentTime, np.session.duration);
-    }
+    const sessionId = np?.session?.id;
+    const currentPos = player.currentTime;
+    const duration = np?.session?.duration;
+
+    // Clear UI immediately — don't block on server sync
     setAudioSource(null);
     setNowPlaying(null);
     nowPlayingRef.current = null;
@@ -297,6 +297,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     if (itemId) {
       DeviceEventEmitter.emit('FOLIO_PLAYBACK_STOPPED', { itemId });
+    }
+
+    // Fire-and-forget server sync so the close button always feels instant
+    if (sessionId) {
+      absAPI.closeSession(sessionId, currentPos, duration).catch(() => {});
     }
   }, [player]);
 
