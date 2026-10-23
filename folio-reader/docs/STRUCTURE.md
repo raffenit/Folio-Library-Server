@@ -1,9 +1,8 @@
 # Folio Component Structure
 
-> **Purpose**: Human-curated documentation of our **understood/intended** codebase structure.
-> 
-> **How to use**: Compare against `STRUCTURE_AUTO.md` (the actual state) to verify they match.
-> If discrepancies exist, update this file to reflect reality OR refactor code to match intent.
+> **Deprecated navigation:** Do not use `(line ~NNN)` entries below for new work. Agents and contributors should use **[CODE-MAP.md](./CODE-MAP.md)** (paths + export names) and ripgrep. When updating docs, prefer editing CODE-MAP; migrate STRUCTURE sections to symbol names over time.
+>
+> **Purpose (legacy):** Human-curated intent. Compare export names against `STRUCTURE_AUTO.md` — not line offsets.
 
 ---
 
